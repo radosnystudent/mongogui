@@ -1,5 +1,11 @@
 from gui.app import App
 
-if __name__ == "__main__":
+
+def main() -> None:
+    """Main entry point for the MongoDB GUI application."""
     app = App()
-    app.run() 
+    app.run()
+
+
+if __name__ == "__main__":
+    main()
