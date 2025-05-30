@@ -14,13 +14,13 @@ echo "=================================="
 # Check if Python 3 is installed
 if ! command -v python3 &> /dev/null; then
     echo -e "${RED}Error: Python 3 is not installed or not in PATH${NC}"
-    echo "Please install Python 3.8 or higher and try again."
+    echo "Please install Python 3.11 or higher and try again."
     exit 1
 fi
 
 # Check Python version
 PYTHON_VERSION=$(python3 -c 'import sys; print(".".join(map(str, sys.version_info[:2])))')
-REQUIRED_VERSION="3.8"
+REQUIRED_VERSION="3.11"
 
 if [ "$(printf '%s\n' "$REQUIRED_VERSION" "$PYTHON_VERSION" | sort -V | head -n1)" != "$REQUIRED_VERSION" ]; then
     echo -e "${RED}Error: Python $PYTHON_VERSION is installed, but Python $REQUIRED_VERSION or higher is required${NC}"
@@ -72,3 +72,13 @@ echo "2. Run the application: ./scripts/run.sh"
 echo "3. For development commands: ./scripts/dev.sh help"
 echo ""
 echo -e "${YELLOW}Note: Make sure you have a MongoDB instance running to test the application.${NC}"
+
+# Update python version check or shebang if present
+for script in ./scripts/*; do
+    if [[ -f "$script" ]]; then
+        # Update shebang to use Python 3.11
+        sed -i.bak "1s|^#!.*|#!/usr/bin/env python3.11|" "$script"
+        # Remove backup file created by sed
+        rm -f "$script.bak"
+    fi
+done

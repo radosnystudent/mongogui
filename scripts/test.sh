@@ -71,6 +71,7 @@ if [[ "$VIRTUAL_ENV" == "" ]]; then
     fi
 fi
 
+# Update python version check or shebang if present
 # Build pytest command
 PYTEST_CMD="pytest"
 

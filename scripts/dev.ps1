@@ -110,6 +110,8 @@ function Dev-Setup {
     Write-Host "Run '.\dev.ps1 help' to see available commands." -ForegroundColor Yellow
 }
 
+# Update python version check or shebang if present
+
 switch ($Command.ToLower()) {
     "help" { Show-Help }
     "install" { Install-Prod }

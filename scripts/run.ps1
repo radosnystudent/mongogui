@@ -21,6 +21,8 @@ try {
     pip install -r requirements.txt
 }
 
+# Update python version check or shebang if present
+
 # Run the application
 Write-Host "Starting MongoDB GUI..." -ForegroundColor Green
 python main.py

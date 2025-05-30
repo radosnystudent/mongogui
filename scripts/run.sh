@@ -20,6 +20,8 @@ if ! python -c "import PyQt5; import pymongo; import keyring" &>/dev/null; then
     pip install -r requirements.txt
 fi
 
+# Update python version check or shebang if present
+
 # Run the application
 echo "Launching MongoDB GUI..."
 python main.py

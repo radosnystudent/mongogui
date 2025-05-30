@@ -7,7 +7,7 @@ name = "mongogui"
 version = "0.1.0"
 description = "A MongoDB GUI application built with PyQt5"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 dependencies = [
     "PyQt5",
     "pymongo",

@@ -171,3 +171,6 @@ echo -e "${CYAN}Next steps:${NC}"
 echo "  - Test the package: pip install dist/*.whl"
 echo "  - Upload to PyPI: twine upload dist/*"
 echo "  - Create GitHub release with the build artifacts"
+
+# Update python version check or shebang if present
+# ...existing code...

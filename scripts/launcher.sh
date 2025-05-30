@@ -21,6 +21,14 @@ if [[ "$MACHINE" == "Linux" || "$MACHINE" == "Mac" ]]; then
     # Make scripts executable if they aren't already
     chmod +x scripts/*.sh 2>/dev/null || true
     
+    # Update python version check or shebang if present
+    for script in scripts/*.sh; do
+        if grep -q -E 'python[[:space:]]+([2-9][0-9]*\.[0-9]+|[0-9]+\.[0-9]+)' "$script"; then
+            sed -i.bak -E 's/python[[:space:]]+([2-9][0-9]*\.[0-9]+|[0-9]+\.[0-9]+)/python3.11/' "$script"
+            echo "Updated Python version in $script"
+        fi
+    done
+    
     # Run the application
     ./scripts/run.sh
     

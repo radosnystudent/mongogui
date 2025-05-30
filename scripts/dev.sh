@@ -193,3 +193,5 @@ case "${1:-help}" in
         exit 1
         ;;
 esac
+
+# Update python version check or shebang if present
