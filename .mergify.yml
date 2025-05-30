@@ -3,12 +3,16 @@ pull_request_rules:
     conditions:
       - base=main
       - approved-reviews-by=radosnystudent
-      - status-success=Format check with Black
-      - status-success=Lint with Ruff
-      - status-success=Type check with Mypy
-      - status-success=Security check with Bandit
-      - status-success=Test with pytest
-      - status-success=Build package
+      - status-success=build
+      - status-success=test (ubuntu-latest, 3.11)
+      - status-success=test (ubuntu-latest, 3.12)
+      - status-success=test (ubuntu-latest, 3.13)
+      - status-success=test (windows-latest, 3.11)
+      - status-success=test (windows-latest, 3.12)
+      - status-success=test (windows-latest, 3.13)
+      - status-success=test (macos-latest, 3.11)
+      - status-success=test (macos-latest, 3.12)
+      - status-success=test (macos-latest, 3.13)
       - -conflict
     actions:
       merge:
