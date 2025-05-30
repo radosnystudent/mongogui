@@ -137,3 +137,6 @@ exclude_lines = [
     "class .*\\bProtocol\\):",
     "@(abc\\.)?abstractmethod",
 ]
+
+[tool.setuptools.packages.find]
+include = ["core*", "gui*"]
