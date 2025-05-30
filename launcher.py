@@ -7,13 +7,14 @@ startup script or launches the application directly.
 """
 
 import os
-import sys
-import subprocess
 import platform
+import subprocess
+import sys
 from pathlib import Path
+from typing import List, Tuple
 
 
-def detect_platform():
+def detect_platform() -> str:
     """Detect the current platform."""
     system = platform.system().lower()
     if system == "windows":
@@ -24,15 +25,7 @@ def detect_platform():
         return "unknown"
 
 
-def check_python_version():
-    """Check if Python version is compatible."""
-    if sys.version_info < (3, 8):
-        print("Error: Python 3.8 or higher is required.")
-        print(f"Current version: {sys.version}")
-        sys.exit(1)
-
-
-def run_command(command, shell=False):
+def run_command(command: List[str], shell: bool = False) -> bool:
     """Run a command and return success status."""
     try:
         result = subprocess.run(command, shell=shell, check=True)
@@ -43,24 +36,35 @@ def run_command(command, shell=False):
         return False
 
 
-def main():
+def main() -> None:
     """Main launcher function."""
     print("MongoDB GUI Application Launcher")
     print("================================")
 
-    # Check Python version
-    check_python_version()
-
-    # Detect platform
     platform_type = detect_platform()
     print(f"Detected platform: {platform_type}")
-    # Get script directory
     script_dir = Path(__file__).parent / "scripts"
 
-    if platform_type == "windows":
-        # Use PowerShell script for Windows
-        powershell_script = script_dir / "run.ps1"
+    if try_run_platform_script(platform_type, script_dir):
+        return
 
+    print("Scripts failed or not found, running application directly...")
+    venv_path = Path("venv")
+    if not venv_path.exists():
+        print("Creating virtual environment...")
+        if not run_command([sys.executable, "-m", "venv", "venv"]):
+            print("Failed to create virtual environment")
+            sys.exit(1)
+
+    python_exe, pip_exe = get_venv_executables(platform_type, venv_path)
+    ensure_dependencies(pip_exe)
+    run_application(python_exe)
+
+
+def try_run_platform_script(platform_type: str, script_dir: Path) -> bool:
+    """Try to run the platform-specific script. Returns True if successful."""
+    if platform_type == "windows":
+        powershell_script = script_dir / "run.ps1"
         print("Attempting to run PowerShell script...")
         if powershell_script.exists():
             if run_command(
@@ -73,47 +77,39 @@ def main():
                 ],
                 shell=False,
             ):
-                return
+                return True
         else:
             print(f"PowerShell script not found: {powershell_script}")
-
     elif platform_type == "unix":
-        # Try shell script
         shell_script = script_dir / "run.sh"
-
         print("Attempting to run shell script...")
         if shell_script.exists():
-            # Make executable
             os.chmod(shell_script, 0o755)
             if run_command([str(shell_script)], shell=False):
-                return
+                return True
+    return False
 
-    # Fallback: run directly
-    print("Scripts failed or not found, running application directly...")
 
-    # Check if virtual environment exists
-    venv_path = Path("venv")
-    if not venv_path.exists():
-        print("Creating virtual environment...")
-        if not run_command([sys.executable, "-m", "venv", "venv"]):
-            print("Failed to create virtual environment")
-            sys.exit(1)
-
-    # Determine Python executable in venv
+def get_venv_executables(platform_type: str, venv_path: Path) -> Tuple[Path, Path]:
+    """Return the python and pip executables for the venv."""
     if platform_type == "windows":
         python_exe = venv_path / "Scripts" / "python.exe"
         pip_exe = venv_path / "Scripts" / "pip.exe"
     else:
         python_exe = venv_path / "bin" / "python"
         pip_exe = venv_path / "bin" / "pip"
+    return python_exe, pip_exe
 
-    # Install dependencies if needed
+
+def ensure_dependencies(pip_exe: Path) -> None:
+    """Ensure all dependencies are installed."""
     print("Checking dependencies...")
     try:
-        import PyQt5
-        import pymongo
-        import keyring
+        import importlib.util
 
+        for pkg in ["keyring", "pymongo", "PyQt5"]:
+            if importlib.util.find_spec(pkg) is None:
+                raise ImportError(f"{pkg} not found")
         print("Dependencies already installed")
     except ImportError:
         print("Installing dependencies...")
@@ -121,7 +117,9 @@ def main():
             print("Failed to install dependencies")
             sys.exit(1)
 
-    # Run the application
+
+def run_application(python_exe: Path) -> None:
+    """Run the main application."""
     print("Starting MongoDB GUI...")
     try:
         subprocess.run([str(python_exe), "main.py"], check=True)

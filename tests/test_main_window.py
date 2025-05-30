@@ -21,7 +21,7 @@ class TestMainWindow:
         with patch("gui.main_window.ConnectionManager"), patch(
             "gui.main_window.MongoClientWrapper"
         ):
-            self.MainWindow = MainWindow
+            self.main_window_class = MainWindow
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")

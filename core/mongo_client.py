@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional, Union
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
+NOT_CONNECTED_MSG = "Not connected to database"
+
 
 class MongoClientWrapper:
     def __init__(self) -> None:
@@ -51,7 +53,7 @@ class MongoClientWrapper:
     def execute_query(self, query_text: str) -> Union[List[Dict[str, Any]], str]:
         """Execute a MongoDB query from text and return results."""
         if self.client is None:
-            return "Not connected to database"
+            return NOT_CONNECTED_MSG
 
         try:
             # Simple query parsing - this is a basic implementation
@@ -98,7 +100,7 @@ class MongoClientWrapper:
                 )  # Limit for safety
                 return results
             else:
-                return "Not connected to database"
+                return NOT_CONNECTED_MSG
         except Exception as e:
             return f"Find query error: {str(e)}"
 
@@ -131,7 +133,7 @@ class MongoClientWrapper:
                 results = list(collection.aggregate(pipeline))
                 return results
             else:
-                return "Not connected to database"
+                return NOT_CONNECTED_MSG
         except Exception as e:
             return f"Aggregate query error: {str(e)}"
 
@@ -141,7 +143,7 @@ class MongoClientWrapper:
         """Run a query with specified parameters."""
         try:
             if self.client is None:
-                return "Not connected to database"
+                return NOT_CONNECTED_MSG
 
             db = self.client[db_name]
             collection = db[collection_name]
@@ -156,7 +158,7 @@ class MongoClientWrapper:
         """Run an aggregation pipeline."""
         try:
             if self.client is None:
-                return "Not connected to database"
+                return NOT_CONNECTED_MSG
 
             db = self.client[db_name]
             collection = db[collection_name]
