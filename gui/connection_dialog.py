@@ -1,12 +1,26 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QCheckBox
+﻿from typing import Optional, Tuple
+
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class ConnectionDialog(QDialog):
-    def __init__(self, parent=None):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("New Connection")
         self.setMinimumWidth(400)
-        self.setWindowFlags(self.windowFlags() & ~Qt.WindowContextHelpButtonHint)
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint  # type: ignore
+        )
         self.name_input = QLineEdit()
         self.db_input = QLineEdit()
         self.ip_input = QLineEdit()
@@ -18,7 +32,9 @@ class ConnectionDialog(QDialog):
         self.tls_checkbox = QCheckBox("Use TLS/SSL")
         self.ok_btn = QPushButton("OK")
         self.cancel_btn = QPushButton("Cancel")
-        self.result = None
+        self.connection_result: Optional[Tuple[str, str, str, str, str, str, bool]] = (
+            None
+        )
 
         layout = QVBoxLayout()
         layout.addWidget(QLabel("Connection Name:"))
@@ -44,15 +60,17 @@ class ConnectionDialog(QDialog):
 
         self.ok_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
-        self.show_password_checkbox.stateChanged.connect(self.toggle_password_visibility)
+        self.show_password_checkbox.stateChanged.connect(
+            self.toggle_password_visibility
+        )
 
-    def toggle_password_visibility(self, state):
+    def toggle_password_visibility(self, state: int) -> None:
         if self.show_password_checkbox.isChecked():
             self.password_input.setEchoMode(QLineEdit.Normal)
         else:
             self.password_input.setEchoMode(QLineEdit.Password)
 
-    def accept(self):
+    def accept(self) -> None:
         name = self.name_input.text().strip()
         db = self.db_input.text().strip()
         ip = self.ip_input.text().strip()
@@ -61,8 +79,8 @@ class ConnectionDialog(QDialog):
         password = self.password_input.text().strip()
         tls = self.tls_checkbox.isChecked()
         if name and db and ip and port:
-            self.result = (name, db, ip, port, login, password, tls)
+            self.connection_result = (name, db, ip, port, login, password, tls)
             super().accept()
 
-    def get_result(self):
-        return self.result
+    def get_result(self) -> Optional[Tuple[str, str, str, str, str, str, bool]]:
+        return self.connection_result
