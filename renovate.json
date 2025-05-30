@@ -1,0 +1,98 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "prHourlyLimit": 10,
+  "rebaseWhen": "behind-base-branch",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "automerge": true,
+    "addLabels": ["lockfile"]
+  },
+  "labels": ["dependencies", "python", "pip", "github-actions"],
+  "packageRules": [
+    {
+      "matchManagers": [
+        "pip_requirements",
+        "pip_setup",
+        "pipenv",
+        "poetry",
+        "github-actions"
+      ],
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "addLabels": ["patch"],
+      "autoApprove": true
+    },
+    {
+      "matchManagers": [
+        "pip_requirements",
+        "pip_setup",
+        "pipenv",
+        "poetry",
+        "github-actions"
+      ],
+      "matchUpdateTypes": ["minor"],
+      "reviewers": ["radosnystudent"],
+      "addLabels": ["minor"],
+      "autoApprove": false
+    },
+    {
+      "matchManagers": [
+        "pip_requirements",
+        "pip_setup",
+        "pipenv",
+        "poetry",
+        "github-actions"
+      ],
+      "matchUpdateTypes": ["major"],
+      "reviewers": ["radosnystudent"],
+      "addLabels": ["major"],
+      "autoApprove": false
+    },
+    {
+      "matchManagers": [
+        "pip_requirements",
+        "pip_setup",
+        "pipenv",
+        "poetry",
+        "github-actions"
+      ],
+      "matchUpdateTypes": ["pin"],
+      "automerge": true,
+      "addLabels": ["pin"],
+      "autoApprove": true
+    },
+    {
+      "matchManagers": [
+        "pip_requirements",
+        "pip_setup",
+        "pipenv",
+        "poetry",
+        "github-actions"
+      ],
+      "matchUpdateTypes": ["digest"],
+      "automerge": true,
+      "addLabels": ["digest"],
+      "autoApprove": true
+    },
+    {
+      "matchManagers": [
+        "pip_requirements",
+        "pip_setup",
+        "pipenv",
+        "poetry",
+        "github-actions"
+      ],
+      "matchUpdateTypes": ["bump"],
+      "automerge": true,
+      "addLabels": ["bump"],
+      "autoApprove": true
+    }
+  ],
+  "automergeType": "pr",
+  "platformAutomerge": true,
+  "dependencyDashboard": true,
+  "schedule": ["at any time"],
+  "prNotPendingHours": 8,
+  "minimumReleaseAge": null
+}
