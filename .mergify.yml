@@ -1,0 +1,23 @@
+pull_request_rules:
+  - name: Automerge approved PRs
+    conditions:
+      - base=main
+      - approved-reviews-by=radosnystudent
+      - status-success=Format check with Black
+      - status-success=Lint with Ruff
+      - status-success=Type check with Mypy
+      - status-success=Security check with Bandit
+      - status-success=Test with pytest
+      - status-success=Build package
+      - -conflict
+    actions:
+      merge:
+        method: rebase
+
+  - name: Notify author about conflicts
+    conditions:
+      - base=main
+      - conflict
+    actions:
+      comment:
+        message: "@{{author}} Your PR is in conflict and cannot be merged."
