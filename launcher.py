@@ -47,41 +47,50 @@ def main():
     """Main launcher function."""
     print("MongoDB GUI Application Launcher")
     print("================================")
-    
+
     # Check Python version
     check_python_version()
-    
+
     # Detect platform
     platform_type = detect_platform()
-    print(f"Detected platform: {platform_type}")    
+    print(f"Detected platform: {platform_type}")
     # Get script directory
     script_dir = Path(__file__).parent / "scripts"
-    
+
     if platform_type == "windows":
         # Use PowerShell script for Windows
         powershell_script = script_dir / "run.ps1"
-        
+
         print("Attempting to run PowerShell script...")
         if powershell_script.exists():
-            if run_command(["powershell.exe", "-ExecutionPolicy", "Bypass", "-File", str(powershell_script)], shell=False):
+            if run_command(
+                [
+                    "powershell.exe",
+                    "-ExecutionPolicy",
+                    "Bypass",
+                    "-File",
+                    str(powershell_script),
+                ],
+                shell=False,
+            ):
                 return
         else:
             print(f"PowerShell script not found: {powershell_script}")
-                
+
     elif platform_type == "unix":
         # Try shell script
         shell_script = script_dir / "run.sh"
-        
+
         print("Attempting to run shell script...")
         if shell_script.exists():
             # Make executable
             os.chmod(shell_script, 0o755)
             if run_command([str(shell_script)], shell=False):
                 return
-    
+
     # Fallback: run directly
     print("Scripts failed or not found, running application directly...")
-    
+
     # Check if virtual environment exists
     venv_path = Path("venv")
     if not venv_path.exists():
@@ -89,7 +98,7 @@ def main():
         if not run_command([sys.executable, "-m", "venv", "venv"]):
             print("Failed to create virtual environment")
             sys.exit(1)
-    
+
     # Determine Python executable in venv
     if platform_type == "windows":
         python_exe = venv_path / "Scripts" / "python.exe"
@@ -97,20 +106,21 @@ def main():
     else:
         python_exe = venv_path / "bin" / "python"
         pip_exe = venv_path / "bin" / "pip"
-    
+
     # Install dependencies if needed
     print("Checking dependencies...")
     try:
         import PyQt5
         import pymongo
         import keyring
+
         print("Dependencies already installed")
     except ImportError:
         print("Installing dependencies...")
         if not run_command([str(pip_exe), "install", "-r", "requirements.txt"]):
             print("Failed to install dependencies")
             sys.exit(1)
-    
+
     # Run the application
     print("Starting MongoDB GUI...")
     try:
