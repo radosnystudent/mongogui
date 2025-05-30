@@ -40,7 +40,13 @@ jobs:
         run: bandit -r . -ll -x launcher.py
 
       - name: Test with pytest
-        run: xvfb-run -a pytest --cov=. --cov-report=xml
+        run: |
+          if [ "$RUNNER_OS" = "Linux" ]; then
+            xvfb-run -a pytest --cov=. --cov-report=xml
+          else
+            pytest --cov=. --cov-report=xml
+          fi
+        shell: bash
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v3
