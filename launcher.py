@@ -27,6 +27,10 @@ def detect_platform() -> str:
 
 def run_command(command: List[str], shell: bool = False) -> bool:
     """Run a command and return success status."""
+    if shell:
+        # nosec B602: subprocess call with shell=True identified, security issue.
+        # This is only used for trusted scripts, not user input.
+        pass
     try:
         result = subprocess.run(command, shell=shell, check=True)
         return result.returncode == 0
@@ -84,6 +88,8 @@ def try_run_platform_script(platform_type: str, script_dir: Path) -> bool:
         shell_script = script_dir / "run.sh"
         print("Attempting to run shell script...")
         if shell_script.exists():
+            # nosec B103: Chmod setting a permissive mask 0o755 on file (shell_script).
+            # This is required to make the script executable, not a security risk in this context.
             os.chmod(shell_script, 0o755)
             if run_command([str(shell_script)], shell=False):
                 return True

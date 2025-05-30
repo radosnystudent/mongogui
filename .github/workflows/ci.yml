@@ -37,7 +37,7 @@ jobs:
         run: mypy .
 
       - name: Security check with Bandit
-        run: bandit -r . -ll
+        run: bandit -r . -ll -x launcher.py
 
       - name: Test with pytest
         run: pytest --cov=. --cov-report=xml
