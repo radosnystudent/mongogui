@@ -11,17 +11,24 @@ from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
     QMenu,
+    QMessageBox,
 )
 
 from core.connection_manager import ConnectionManager
 from core.mongo_client import MongoClientWrapper
 from gui.connection_dialog import ConnectionDialog
+from gui.connection_widgets import ConnectionWidgetsMixin
+from gui.query_panel import QueryPanelMixin
+from gui.collection_panel import CollectionPanelMixin
+from gui.ui_utils import set_minimum_heights
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, ConnectionWidgetsMixin, QueryPanelMixin, CollectionPanelMixin):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("MongoDB GUI")
@@ -38,6 +45,7 @@ class MainWindow(QMainWindow):
         self.last_query_type = ""
         self.last_collection = ""
         self.data_table: Optional[QTableWidget] = None
+        self.json_tree: Optional[QTreeWidget] = None
 
         self.setup_ui()
         self.load_connections()
@@ -79,6 +87,8 @@ class MainWindow(QMainWindow):
         self.collection_scroll = QScrollArea()
         self.collection_widget = QWidget()
         self.collection_layout = QVBoxLayout(self.collection_widget)
+        self.collection_layout.setSpacing(0)  # Remove all spacing between buttons
+        self.collection_layout.setContentsMargins(0, 0, 0, 0)
         self.collection_scroll.setWidget(self.collection_widget)
         self.collection_scroll.setWidgetResizable(True)
         left_layout.addWidget(self.collection_scroll)
@@ -151,10 +161,11 @@ class MainWindow(QMainWindow):
         self.data_table = QTableWidget()
         results_splitter.addWidget(self.data_table)
 
-        # Raw JSON view
-        self.result_display = QTextEdit()
-        self.result_display.setReadOnly(True)
-        results_splitter.addWidget(self.result_display)
+        # JSON tree view
+        self.json_tree = QTreeWidget()
+        self.json_tree.setHeaderLabels(["Key", "Value"])
+        results_splitter.addWidget(self.json_tree)
+        self.json_tree.hide()
 
         results_splitter.setSizes([400, 200])
         right_layout.addWidget(results_splitter, stretch=1)
@@ -213,10 +224,220 @@ class MainWindow(QMainWindow):
         elif action == remove_action:
             self.remove_connection(name)
 
+    def connect_to_database(self, connection_name: str) -> None:
+        conn_data = self.conn_manager.get_connection_by_name(connection_name)
+        if not conn_data:
+            self.db_info_label.setText(f"Connection '{connection_name}' not found")
+            return
+
+        try:
+            self.mongo_client = MongoClientWrapper()
+            success = self.mongo_client.connect(
+                conn_data["ip"],
+                conn_data["port"],
+                conn_data["db"],
+                conn_data.get("login"),
+                conn_data.get("password"),
+                conn_data.get("tls", False),
+            )
+
+            if success:
+                self.current_connection = conn_data
+                self.db_info_label.setText(f"Connected to: {connection_name}")
+                self.load_collections()
+            else:
+                self.db_info_label.setText(f"Failed to connect to {connection_name}")
+        except Exception as e:
+            QMessageBox.critical(self, "Connection Error", f"Connection error: {str(e)}")
+
+    def load_collections(self) -> None:
+        if not self.mongo_client:
+            return  # Clear existing collection widgets
+        while self.collection_layout.count():
+            child = self.collection_layout.takeAt(0)
+            if child and child.widget():
+                widget = child.widget()
+                if widget:
+                    widget.deleteLater()
+
+        try:
+            collections = self.mongo_client.list_collections()
+            # Sort collections alphabetically
+            collections = sorted(collections)
+            for collection_name in collections:
+                self.add_collection_widget(collection_name)
+            self.collection_layout.addStretch(1)
+        except Exception as e:
+            self.db_info_label.setPlainText(f"Error loading collections: {str(e)}")
+
+    def add_collection_widget(self, collection_name: str) -> None:
+        collection_btn = QPushButton(collection_name)
+        collection_btn.clicked.connect(
+            lambda: self.query_input.setPlainText(f"db.{collection_name}.find({{}})")
+        )
+        self.collection_layout.addWidget(collection_btn)
+
+    def execute_query(self) -> None:
+        if not self.mongo_client:
+            self.db_info_label.setPlainText("No database connection")
+            return
+
+        query_text = self.query_input.toPlainText().strip()
+        if not query_text:
+            self.db_info_label.setPlainText("Please enter a query")
+            return
+
+        try:
+            # Parse and execute query
+            result = self.mongo_client.execute_query(query_text)
+
+            if isinstance(result, list):
+                self.results = result
+                self.current_page = 0
+                self.last_query = query_text
+                self.display_results()
+            else:
+                self.db_info_label.setPlainText(f"Error: {result}")
+        except Exception as e:
+            self.db_info_label.setPlainText(f"Query error: {str(e)}")
+
+    def display_results(self) -> None:
+        if not self.results:
+            # Remove reference to self.result_display
+            # self.result_display.setPlainText("No results")
+            if self.data_table:
+                self.data_table.setRowCount(0)
+            return
+
+        # Calculate pagination
+        start_idx = self.current_page * self.page_size
+        end_idx = min(start_idx + self.page_size, len(self.results))
+        page_results = self.results[start_idx:end_idx]
+
+        # Update navigation controls
+        self.prev_btn.setEnabled(self.current_page > 0)
+        self.next_btn.setEnabled(end_idx < len(self.results))
+        self.page_label.setText(f"Page {self.current_page + 1}")
+        self.result_count_label.setText(
+            f"Showing {start_idx + 1}-{end_idx} of {len(self.results)} results"
+        )
+
+        # Display in table format
+        self.display_table_results(page_results)
+
+        # Remove raw JSON display
+        # import json
+        # if page_results:
+        #     self.result_display.setPlainText(
+        #         "\n\n".join(json.dumps(doc, indent=2, default=str) for doc in page_results)
+        #     )
+        # else:
+        #     self.result_display.setPlainText("")
+        # Display in tree format
+        self.display_tree_results(page_results)
+
+    def display_table_results(self, results: List[Dict[str, Any]]) -> None:
+        if not results or not self.data_table:
+            return
+
+        # Get all unique keys from all documents
+        all_keys: Set[str] = set()
+        for doc in results:
+            all_keys.update(doc.keys())
+
+        # Convert to sorted list for consistent column ordering
+        columns = sorted(all_keys)
+
+        # Set up table
+        self.data_table.setColumnCount(len(columns))
+        self.data_table.setRowCount(len(results))
+        self.data_table.setHorizontalHeaderLabels(columns)
+
+        # Populate table
+        for row, doc in enumerate(results):
+            for col, key in enumerate(columns):
+                value = doc.get(key, "")
+                self.data_table.setItem(row, col, QTableWidgetItem(str(value)))
+
+    def display_tree_results(self, results: List[Dict[str, Any]]) -> None:
+        if not self.json_tree:
+            return
+        if not results:
+            self.json_tree.clear()
+            self.json_tree.hide()
+            return
+        self.json_tree.clear()
+        self.json_tree.show()
+        for idx, doc in enumerate(results):
+            # Use _id if present, else fallback label
+            doc_id = doc.get("_id", f"Document {idx + 1}")
+            doc_item = QTreeWidgetItem(self.json_tree, [str(doc_id), ""])
+            self.add_tree_item(doc_item, doc)
+            doc_item.setExpanded(False)
+
+    def add_tree_item(self, parent: QTreeWidgetItem, data: Dict[str, Any]) -> None:
+        for key, value in data.items():
+            if isinstance(value, dict):
+                child = QTreeWidgetItem(parent, [key, ""])
+                self.add_tree_item(child, value)
+            elif isinstance(value, list):
+                child = QTreeWidgetItem(parent, [key, f"Array ({len(value)})"])
+                for item in value:
+                    if isinstance(item, dict):
+                        self.add_tree_item(child, item)
+                    else:
+                        QTreeWidgetItem(child, ["", str(item)])
+            else:
+                QTreeWidgetItem(parent, [key, str(value)])
+
+    def clear_query(self) -> None:
+        self.query_input.clear()
+
+    def previous_page(self) -> None:
+        if self.current_page > 0:
+            self.current_page -= 1
+            self.display_results()
+
+    def next_page(self) -> None:
+        if (self.current_page + 1) * self.page_size < len(self.results):
+            self.current_page += 1
+            self.display_results()
+
+    def resizeEvent(self, a0) -> None:
+        super().resizeEvent(a0)
+        set_minimum_heights(self)
+
+    def edit_connection(self, name: str) -> None:
+        conn_data = self.conn_manager.get_connection_by_name(name)
+        if not conn_data:
+            self.db_info_label.setText(f"Connection '{name}' not found")
+            return
+        dialog = ConnectionDialog(self)
+        # Pre-fill dialog fields
+        dialog.name_input.setText(conn_data["name"])
+        dialog.db_input.setText(conn_data["db"])
+        dialog.ip_input.setText(conn_data["ip"])
+        dialog.port_input.setText(str(conn_data["port"]))
+        dialog.login_input.setText(conn_data.get("login", ""))
+        dialog.password_input.setText(conn_data.get("password", ""))
+        dialog.tls_checkbox.setChecked(conn_data.get("tls", False))
+        if dialog.exec_() == ConnectionDialog.Accepted:
+            result = dialog.get_result()
+            if result:
+                new_name, db, ip, port, login, password, tls = result
+                try:
+                    port_int = int(port)
+                    self.conn_manager.update_connection(
+                        name, db, ip, port_int, login, password, tls, new_name=new_name
+                    )
+                    self.load_connections()
+                except ValueError:
+                    QMessageBox.critical(self, "Edit Error", "Error: Invalid port number")
+
     def duplicate_connection(self, name: str) -> None:
         conn_data = self.conn_manager.get_connection_by_name(name)
         if not conn_data:
-            self.result_display.setPlainText(f"Connection '{name}' not found")
+            self.db_info_label.setText(f"Connection '{name}' not found")
             return
         # Remove credentials from the copy (user can edit after creation)
         conn_data = dict(conn_data)
@@ -246,9 +467,9 @@ class MainWindow(QMainWindow):
                 conn_data.get("tls", False),
             )
             self.load_connections()
-            self.result_display.setPlainText(f"Duplicated connection as '{new_name}'")
+            self.db_info_label.setText(f"Duplicated connection as '{new_name}'")
         except Exception as e:
-            self.result_display.setPlainText(f"Failed to duplicate: {e}")
+            QMessageBox.critical(self, "Duplicate Error", f"Failed to duplicate: {e}")
 
     def add_connection(self) -> None:
         dialog = ConnectionDialog(self)
@@ -263,202 +484,7 @@ class MainWindow(QMainWindow):
                     )
                     self.load_connections()
                 except ValueError:
-                    self.result_display.setPlainText("Error: Invalid port number")
-
-    def connect_to_database(self, connection_name: str) -> None:
-        conn_data = self.conn_manager.get_connection_by_name(connection_name)
-        if not conn_data:
-            self.result_display.setPlainText(
-                f"Connection '{connection_name}' not found"
-            )
-            return
-
-        try:
-            self.mongo_client = MongoClientWrapper()
-            success = self.mongo_client.connect(
-                conn_data["ip"],
-                conn_data["port"],
-                conn_data["db"],
-                conn_data.get("login"),
-                conn_data.get("password"),
-                conn_data.get("tls", False),
-            )
-
-            if success:
-                self.current_connection = conn_data
-                self.db_info_label.setText(f"Connected to: {connection_name}")
-                self.load_collections()
-                self.result_display.setPlainText(f"Connected to {connection_name}")
-            else:
-                self.result_display.setPlainText(
-                    f"Failed to connect to {connection_name}"
-                )
-        except Exception as e:
-            self.result_display.setPlainText(f"Connection error: {str(e)}")
-
-    def load_collections(self) -> None:
-        if not self.mongo_client:
-            return  # Clear existing collection widgets
-        while self.collection_layout.count():
-            child = self.collection_layout.takeAt(0)
-            if child and child.widget():
-                widget = child.widget()
-                if widget:
-                    widget.deleteLater()
-
-        try:
-            collections = self.mongo_client.list_collections()
-            for collection_name in collections:
-                self.add_collection_widget(collection_name)
-        except Exception as e:
-            self.result_display.setPlainText(f"Error loading collections: {str(e)}")
-
-    def add_collection_widget(self, collection_name: str) -> None:
-        collection_btn = QPushButton(collection_name)
-        collection_btn.clicked.connect(
-            lambda: self.query_input.setPlainText(f"db.{collection_name}.find({{}})")
-        )
-        self.collection_layout.addWidget(collection_btn)
-
-    def execute_query(self) -> None:
-        if not self.mongo_client:
-            self.result_display.setPlainText("No database connection")
-            return
-
-        query_text = self.query_input.toPlainText().strip()
-        if not query_text:
-            self.result_display.setPlainText("Please enter a query")
-            return
-
-        try:
-            # Parse and execute query
-            result = self.mongo_client.execute_query(query_text)
-
-            if isinstance(result, list):
-                self.results = result
-                self.current_page = 0
-                self.last_query = query_text
-                self.display_results()
-            else:
-                self.result_display.setPlainText(f"Error: {result}")
-        except Exception as e:
-            self.result_display.setPlainText(f"Query error: {str(e)}")
-
-    def display_results(self) -> None:
-        if not self.results:
-            self.result_display.setPlainText("No results")
-            if self.data_table:
-                self.data_table.setRowCount(0)
-            return
-
-        # Calculate pagination
-        start_idx = self.current_page * self.page_size
-        end_idx = min(start_idx + self.page_size, len(self.results))
-        page_results = self.results[start_idx:end_idx]
-
-        # Update navigation controls
-        self.prev_btn.setEnabled(self.current_page > 0)
-        self.next_btn.setEnabled(end_idx < len(self.results))
-        self.page_label.setText(f"Page {self.current_page + 1}")
-        self.result_count_label.setText(
-            f"Showing {start_idx + 1}-{end_idx} of {len(self.results)} results"
-        )
-
-        # Display in table format
-        self.display_table_results(page_results)
-
-        # Display raw JSON
-        import json
-
-        self.result_display.setPlainText(
-            json.dumps(page_results, indent=2, default=str)
-        )
-
-    def display_table_results(self, results: List[Dict[str, Any]]) -> None:
-        if not results or not self.data_table:
-            return
-
-        # Get all unique keys from all documents
-        all_keys: Set[str] = set()
-        for doc in results:
-            all_keys.update(doc.keys())
-
-        # Convert to sorted list for consistent column ordering
-        columns = sorted(all_keys)
-
-        # Set up table
-        self.data_table.setColumnCount(len(columns))
-        self.data_table.setRowCount(len(results))
-        self.data_table.setHorizontalHeaderLabels(columns)
-
-        # Populate table
-        for row, doc in enumerate(results):
-            for col, key in enumerate(columns):
-                value = doc.get(key, "")
-                self.data_table.setItem(row, col, QTableWidgetItem(str(value)))
-
-    def clear_query(self) -> None:
-        self.query_input.clear()
-
-    def previous_page(self) -> None:
-        if self.current_page > 0:
-            self.current_page -= 1
-            self.display_results()
-
-    def next_page(self) -> None:
-        if (self.current_page + 1) * self.page_size < len(self.results):
-            self.current_page += 1
-            self.display_results()
-
-    def resizeEvent(self, a0) -> None:
-        """Handle window resize events to adjust layout for fullscreen and resolution changes."""
-        super().resizeEvent(a0)
-        min_width = 1200
-        min_height = 800
-        # Enforce minimum size
-        if self.width() < min_width or self.height() < min_height:
-            self.resize(max(self.width(), min_width), max(self.height(), min_height))
-        # Dynamically adjust the heights of the query and results sections
-        if hasattr(self, 'query_input') and self.query_input is not None:
-            self.query_input.setFixedHeight(max(100, int(self.height() * 0.10)))
-        if hasattr(self, 'data_table') and self.data_table is not None:
-            try:
-                self.data_table.setMinimumHeight(int(self.height() * 0.35))
-            except Exception:
-                pass
-        if hasattr(self, 'result_display') and self.result_display is not None:
-            try:
-                self.result_display.setMinimumHeight(int(self.height() * 0.35))
-            except Exception:
-                pass
-        self.updateGeometry()
-
-    def edit_connection(self, name: str) -> None:
-        conn_data = self.conn_manager.get_connection_by_name(name)
-        if not conn_data:
-            self.result_display.setPlainText(f"Connection '{name}' not found")
-            return
-        dialog = ConnectionDialog(self)
-        # Pre-fill dialog fields
-        dialog.name_input.setText(conn_data["name"])
-        dialog.db_input.setText(conn_data["db"])
-        dialog.ip_input.setText(conn_data["ip"])
-        dialog.port_input.setText(str(conn_data["port"]))
-        dialog.login_input.setText(conn_data.get("login", ""))
-        dialog.password_input.setText(conn_data.get("password", ""))
-        dialog.tls_checkbox.setChecked(conn_data.get("tls", False))
-        if dialog.exec_() == ConnectionDialog.Accepted:
-            result = dialog.get_result()
-            if result:
-                new_name, db, ip, port, login, password, tls = result
-                try:
-                    port_int = int(port)
-                    self.conn_manager.update_connection(
-                        name, db, ip, port_int, login, password, tls, new_name=new_name
-                    )
-                    self.load_connections()
-                except ValueError:
-                    self.result_display.setPlainText("Error: Invalid port number")
+                    self.db_info_label.setPlainText("Error: Invalid port number")
 
     def remove_connection(self, name: str) -> None:
         self.conn_manager.remove_connection(name)
