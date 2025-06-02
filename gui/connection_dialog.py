@@ -12,7 +12,6 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-
 class ConnectionDialog(QDialog):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)

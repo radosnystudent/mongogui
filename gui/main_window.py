@@ -1,5 +1,6 @@
 from typing import Any, Dict, List, Optional, Set
 
+from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
@@ -12,6 +13,7 @@ from PyQt5.QtWidgets import (
     QTextEdit,
     QVBoxLayout,
     QWidget,
+    QMenu,
 )
 
 from core.connection_manager import ConnectionManager
@@ -114,6 +116,8 @@ class MainWindow(QMainWindow):
 
         # Results display
         results_label = QLabel("Results:")
+        # Add spacing above Results label
+        right_layout.addSpacing(30)
         right_layout.addWidget(results_label)
 
         # Results navigation
@@ -141,6 +145,7 @@ class MainWindow(QMainWindow):
 
         # Results area using splitter
         results_splitter = QSplitter()
+        results_splitter.setOrientation(Qt.Orientation.Vertical)
 
         # Table view
         self.data_table = QTableWidget()
@@ -151,10 +156,11 @@ class MainWindow(QMainWindow):
         self.result_display.setReadOnly(True)
         results_splitter.addWidget(self.result_display)
 
-        results_splitter.setSizes([600, 400])
-        right_layout.addWidget(results_splitter)
+        results_splitter.setSizes([400, 200])
+        right_layout.addWidget(results_splitter, stretch=1)
 
-        main_layout.addWidget(right_panel)
+        right_panel.setLayout(right_layout)
+        main_layout.addWidget(right_panel, stretch=1)
 
     def load_connections(self) -> None:  # Clear existing connection widgets
         while self.connection_layout.count():
@@ -172,21 +178,77 @@ class MainWindow(QMainWindow):
     def add_connection_widget(self, conn: Dict[str, Any]) -> None:
         conn_widget = QWidget()
         conn_layout = QVBoxLayout(conn_widget)
-        conn_layout.setContentsMargins(5, 5, 5, 5)
+        conn_layout.setContentsMargins(0, 0, 0, 0)
+        conn_layout.setSpacing(10)
 
         # Connection name and info
         name_label = QLabel(f"<b>{conn['name']}</b>")
+        name_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        name_label.customContextMenuRequested.connect(
+            lambda pos, n=conn["name"]: self.show_connection_context_menu(pos, n, name_label)
+        )
         conn_layout.addWidget(name_label)
 
         info_label = QLabel(f"{conn['ip']}:{conn['port']}")
         conn_layout.addWidget(info_label)
 
-        # Connect button
+        # Connect button only
         connect_btn = QPushButton("Connect")
         connect_btn.clicked.connect(lambda: self.connect_to_database(conn["name"]))
         conn_layout.addWidget(connect_btn)
 
+        conn_layout.addStretch(1)
         self.connection_layout.addWidget(conn_widget)
+
+    def show_connection_context_menu(self, pos, name, widget):
+        menu = QMenu(widget)
+        edit_action = menu.addAction("Edit")
+        duplicate_action = menu.addAction("Duplicate")
+        remove_action = menu.addAction("Remove")
+        action = menu.exec_(widget.mapToGlobal(pos))
+        if action == edit_action:
+            self.edit_connection(name)
+        elif action == duplicate_action:
+            self.duplicate_connection(name)
+        elif action == remove_action:
+            self.remove_connection(name)
+
+    def duplicate_connection(self, name: str) -> None:
+        conn_data = self.conn_manager.get_connection_by_name(name)
+        if not conn_data:
+            self.result_display.setPlainText(f"Connection '{name}' not found")
+            return
+        # Remove credentials from the copy (user can edit after creation)
+        conn_data = dict(conn_data)
+        conn_data["login"] = conn_data.get("login", "")
+        conn_data["password"] = conn_data.get("password", "")
+        # Generate a unique name for the duplicate
+        base_name = name
+        if base_name.endswith(")"):
+            # Remove trailing (Copy X) or (Copy)
+            import re
+            base_name = re.sub(r" \(Copy( \d+)?\)$", "", base_name)
+        new_name = f"{base_name} (Copy)"
+        existing_names = {c["name"] for c in self.conn_manager.get_connections()}
+        copy_idx = 2
+        while new_name in existing_names:
+            new_name = f"{base_name} (Copy {copy_idx})"
+            copy_idx += 1
+        # Save the duplicated connection
+        try:
+            self.conn_manager.add_connection(
+                new_name,
+                conn_data["db"],
+                conn_data["ip"],
+                conn_data["port"],
+                conn_data.get("login", ""),
+                conn_data.get("password", ""),
+                conn_data.get("tls", False),
+            )
+            self.load_connections()
+            self.result_display.setPlainText(f"Duplicated connection as '{new_name}'")
+        except Exception as e:
+            self.result_display.setPlainText(f"Failed to duplicate: {e}")
 
     def add_connection(self) -> None:
         dialog = ConnectionDialog(self)
@@ -347,3 +409,57 @@ class MainWindow(QMainWindow):
         if (self.current_page + 1) * self.page_size < len(self.results):
             self.current_page += 1
             self.display_results()
+
+    def resizeEvent(self, a0) -> None:
+        """Handle window resize events to adjust layout for fullscreen and resolution changes."""
+        super().resizeEvent(a0)
+        min_width = 1200
+        min_height = 800
+        # Enforce minimum size
+        if self.width() < min_width or self.height() < min_height:
+            self.resize(max(self.width(), min_width), max(self.height(), min_height))
+        # Dynamically adjust the heights of the query and results sections
+        if hasattr(self, 'query_input') and self.query_input is not None:
+            self.query_input.setFixedHeight(max(100, int(self.height() * 0.10)))
+        if hasattr(self, 'data_table') and self.data_table is not None:
+            try:
+                self.data_table.setMinimumHeight(int(self.height() * 0.35))
+            except Exception:
+                pass
+        if hasattr(self, 'result_display') and self.result_display is not None:
+            try:
+                self.result_display.setMinimumHeight(int(self.height() * 0.35))
+            except Exception:
+                pass
+        self.updateGeometry()
+
+    def edit_connection(self, name: str) -> None:
+        conn_data = self.conn_manager.get_connection_by_name(name)
+        if not conn_data:
+            self.result_display.setPlainText(f"Connection '{name}' not found")
+            return
+        dialog = ConnectionDialog(self)
+        # Pre-fill dialog fields
+        dialog.name_input.setText(conn_data["name"])
+        dialog.db_input.setText(conn_data["db"])
+        dialog.ip_input.setText(conn_data["ip"])
+        dialog.port_input.setText(str(conn_data["port"]))
+        dialog.login_input.setText(conn_data.get("login", ""))
+        dialog.password_input.setText(conn_data.get("password", ""))
+        dialog.tls_checkbox.setChecked(conn_data.get("tls", False))
+        if dialog.exec_() == ConnectionDialog.Accepted:
+            result = dialog.get_result()
+            if result:
+                new_name, db, ip, port, login, password, tls = result
+                try:
+                    port_int = int(port)
+                    self.conn_manager.update_connection(
+                        name, db, ip, port_int, login, password, tls, new_name=new_name
+                    )
+                    self.load_connections()
+                except ValueError:
+                    self.result_display.setPlainText("Error: Invalid port number")
+
+    def remove_connection(self, name: str) -> None:
+        self.conn_manager.remove_connection(name)
+        self.load_connections()

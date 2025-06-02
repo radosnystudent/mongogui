@@ -3,6 +3,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 import keyring
+from keyring.errors import PasswordDeleteError
 
 
 class ConnectionManager:
@@ -56,3 +57,49 @@ class ConnectionManager:
                 return data
         except FileNotFoundError:
             return None
+
+    def update_connection(
+        self,
+        old_name: str,
+        db: str,
+        ip: str,
+        port: int,
+        login: Optional[str],
+        password: Optional[str],
+        tls: bool,
+        new_name: Optional[str] = None,
+    ) -> None:
+        """
+        Update an existing connection. If new_name is provided and different from old_name, the connection is renamed.
+        Overwrites the connection file and credentials.
+        """
+        # If renaming, remove old file and credentials
+        name_to_use = new_name if new_name else old_name
+        if new_name and new_name != old_name:
+            old_file = os.path.join(self.storage_path, f"{old_name}.json")
+            if os.path.exists(old_file):
+                os.remove(old_file)
+            try:
+                keyring.delete_password(self.keyring_service, f"{old_name}_login")
+            except PasswordDeleteError:
+                pass
+            try:
+                keyring.delete_password(self.keyring_service, f"{old_name}_password")
+            except PasswordDeleteError:
+                pass
+        # Add or overwrite the connection
+        self.add_connection(name_to_use, db, ip, port, login, password, tls)
+
+    def remove_connection(self, name: str) -> None:
+        # Remove the connection file and credentials
+        file_path = os.path.join(self.storage_path, f"{name}.json")
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        try:
+            keyring.delete_password(self.keyring_service, f"{name}_login")
+        except PasswordDeleteError:
+            pass
+        try:
+            keyring.delete_password(self.keyring_service, f"{name}_password")
+        except PasswordDeleteError:
+            pass
