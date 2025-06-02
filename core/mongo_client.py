@@ -166,3 +166,17 @@ class MongoClientWrapper:
             return results
         except Exception as e:
             return str(e)
+
+    def update_document(
+        self, collection_name: str, doc_id: Any, new_doc: Dict[str, Any]
+    ) -> bool:
+        """Update a document by _id in the given collection."""
+        if self.client is None:
+            return False
+        try:
+            db = self.client[self.current_db]
+            collection = db[collection_name]
+            result = collection.replace_one({"_id": doc_id}, new_doc)
+            return result.modified_count > 0
+        except Exception:
+            return False

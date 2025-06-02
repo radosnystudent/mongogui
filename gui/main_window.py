@@ -2,6 +2,8 @@ from typing import Any, Dict, List, Optional, Set
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QAbstractItemView,
+    QDialog,
     QHBoxLayout,
     QLabel,
     QMainWindow,
@@ -26,6 +28,10 @@ from gui.connection_widgets import ConnectionWidgetsMixin
 from gui.query_panel import QueryPanelMixin
 from gui.collection_panel import CollectionPanelMixin
 from gui.ui_utils import set_minimum_heights
+from gui.edit_document_dialog import EditDocumentDialog
+
+EDIT_DOCUMENT_ACTION = "Edit Document"
+EDIT_DOCUMENT_TITLE = EDIT_DOCUMENT_ACTION
 
 
 class MainWindow(QMainWindow, ConnectionWidgetsMixin, QueryPanelMixin, CollectionPanelMixin):
@@ -325,14 +331,6 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin, QueryPanelMixin, Collectio
         # Display in table format
         self.display_table_results(page_results)
 
-        # Remove raw JSON display
-        # import json
-        # if page_results:
-        #     self.result_display.setPlainText(
-        #         "\n\n".join(json.dumps(doc, indent=2, default=str) for doc in page_results)
-        #     )
-        # else:
-        #     self.result_display.setPlainText("")
         # Display in tree format
         self.display_tree_results(page_results)
 
@@ -340,24 +338,39 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin, QueryPanelMixin, Collectio
         if not results or not self.data_table:
             return
 
-        # Get all unique keys from all documents
         all_keys: Set[str] = set()
         for doc in results:
             all_keys.update(doc.keys())
-
-        # Convert to sorted list for consistent column ordering
         columns = sorted(all_keys)
-
-        # Set up table
         self.data_table.setColumnCount(len(columns))
         self.data_table.setRowCount(len(results))
         self.data_table.setHorizontalHeaderLabels(columns)
+        self.data_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.data_table.customContextMenuRequested.connect(self.show_table_context_menu)
 
-        # Populate table
+        self._table_row_docs = []  # Store docs for context menu
         for row, doc in enumerate(results):
+            self._table_row_docs.append(doc)
             for col, key in enumerate(columns):
                 value = doc.get(key, "")
                 self.data_table.setItem(row, col, QTableWidgetItem(str(value)))
+
+    def show_table_context_menu(self, pos):
+        if not self.data_table:
+            return
+        index = self.data_table.indexAt(pos)
+        if not index.isValid():
+            return
+        doc = self._table_row_docs[index.row()] if hasattr(self, '_table_row_docs') and index.row() < len(self._table_row_docs) else None
+        if doc:
+            menu = QMenu(self.data_table)
+            edit_action = menu.addAction(EDIT_DOCUMENT_ACTION)
+            viewport = self.data_table.viewport() if hasattr(self.data_table, 'viewport') else None
+            global_pos = viewport.mapToGlobal(pos) if viewport else self.data_table.mapToGlobal(pos)
+            action = menu.exec_(global_pos)
+            if action == edit_action:
+                self.edit_document(doc)
 
     def display_tree_results(self, results: List[Dict[str, Any]]) -> None:
         if not self.json_tree:
@@ -369,11 +382,56 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin, QueryPanelMixin, Collectio
         self.json_tree.clear()
         self.json_tree.show()
         for idx, doc in enumerate(results):
-            # Use _id if present, else fallback label
             doc_id = doc.get("_id", f"Document {idx + 1}")
             doc_item = QTreeWidgetItem(self.json_tree, [str(doc_id), ""])
             self.add_tree_item(doc_item, doc)
             doc_item.setExpanded(False)
+            # Store doc in item using setData with Qt.ItemDataRole
+            doc_item.setData(0, int(Qt.ItemDataRole.UserRole), doc)
+        self.json_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.json_tree.customContextMenuRequested.connect(self.show_tree_context_menu)
+
+    def show_tree_context_menu(self, pos):
+        if not self.json_tree:
+            return
+        item = self.json_tree.itemAt(pos)
+        if item and item.parent() is None:  # Only top-level items
+            menu = QMenu(self.json_tree)
+            edit_action = menu.addAction(EDIT_DOCUMENT_ACTION)
+            viewport = self.json_tree.viewport() if hasattr(self.json_tree, 'viewport') else None
+            global_pos = viewport.mapToGlobal(pos) if viewport else self.json_tree.mapToGlobal(pos)
+            action = menu.exec_(global_pos)
+            if action == edit_action:
+                doc = item.data(0, int(Qt.ItemDataRole.UserRole))
+                if doc:
+                    self.edit_document(doc)
+
+    def edit_document(self, document: dict) -> None:
+        dialog = EditDocumentDialog(document, self)
+        if dialog.exec_() == QDialog.Accepted:
+            edited_doc = dialog.get_edited_document()
+            if edited_doc is not None:
+                self.update_document_in_db(edited_doc)
+
+    def update_document_in_db(self, edited_doc: dict) -> None:
+        # Update document in DB using self.mongo_client
+        if not self.mongo_client or '_id' not in edited_doc:
+            QMessageBox.warning(self, EDIT_DOCUMENT_TITLE, "Cannot update document: missing _id or no DB connection.")
+            return
+        try:
+            # Use the current collection (parsed from last_query or last_collection)
+            collection = self.last_collection
+            if not collection:
+                QMessageBox.warning(self, EDIT_DOCUMENT_TITLE, "Cannot determine collection for update.")
+                return
+            result = self.mongo_client.update_document(collection, edited_doc['_id'], edited_doc)
+            if result:
+                QMessageBox.information(self, EDIT_DOCUMENT_TITLE, "Document updated successfully.")
+                self.execute_query()  # Refresh results
+            else:
+                QMessageBox.warning(self, EDIT_DOCUMENT_TITLE, "Document update failed.")
+        except Exception as e:
+            QMessageBox.critical(self, EDIT_DOCUMENT_TITLE, f"Error updating document: {e}")
 
     def add_tree_item(self, parent: QTreeWidgetItem, data: Dict[str, Any]) -> None:
         for key, value in data.items():
