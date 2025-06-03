@@ -49,10 +49,9 @@ class TestMainWindow:
         # Setup mock connection manager
         mock_conn_manager_instance = MagicMock()
         mock_conn_manager.return_value = mock_conn_manager_instance
-
         mock_connections = [
-            {"name": "test1", "ip": "localhost", "port": 27017},
-            {"name": "test2", "ip": "192.168.1.100", "port": 27018},
+            {"name": "test1", "ip": "localhost", "port": 27017, "db": "testdb1"},
+            {"name": "test2", "ip": "192.168.1.100", "port": 27018, "db": "testdb2"},
         ]
         mock_conn_manager_instance.get_connections.return_value = mock_connections
 
