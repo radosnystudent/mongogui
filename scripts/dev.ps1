@@ -20,6 +20,7 @@ function Show-Help {
     Write-Host "  build          Build the package" -ForegroundColor Cyan
     Write-Host "  clean          Clean build artifacts" -ForegroundColor Cyan
     Write-Host "  all            Run all checks" -ForegroundColor Cyan
+    Write-Host "  all-checks     Run lint, mypy, format-check, and tests" -ForegroundColor Cyan
     Write-Host "  dev-setup      Set up development environment" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Usage: .\dev.ps1 <command>" -ForegroundColor Yellow
@@ -103,6 +104,14 @@ function Run-All {
     Run-Tests
 }
 
+function Run-AllChecks {
+    Write-Host "Running all static checks and tests..." -ForegroundColor Green
+    Lint-Code
+    Type-Check
+    Check-Format
+    Run-Tests
+}
+
 function Dev-Setup {
     Write-Host "Setting up development environment..." -ForegroundColor Green
     Install-Dev
@@ -127,6 +136,7 @@ switch ($Command.ToLower()) {
     "build" { Build-Package }
     "clean" { Clean-Artifacts }
     "all" { Run-All }
+    "all-checks" { Run-AllChecks }
     "dev-setup" { Dev-Setup }
     default { 
         Write-Host "Unknown command: $Command" -ForegroundColor Red

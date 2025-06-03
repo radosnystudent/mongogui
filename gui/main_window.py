@@ -24,14 +24,12 @@ from PyQt5.QtWidgets import (
 from core.connection_manager import ConnectionManager
 from core.mongo_client import MongoClientWrapper
 from gui.collection_panel import CollectionPanelMixin
-from gui.connection_dialog import ConnectionDialog
+from gui.connection_dialog import ConnectionDialog  # Add this import for test patching
 from gui.connection_widgets import ConnectionWidgetsMixin
+from gui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
 from gui.edit_document_dialog import EditDocumentDialog
 from gui.query_panel import QueryPanelMixin
 from gui.ui_utils import set_minimum_heights
-
-EDIT_DOCUMENT_ACTION = "Edit Document"
-EDIT_DOCUMENT_TITLE = EDIT_DOCUMENT_ACTION
 
 
 class MainWindow(
@@ -42,8 +40,10 @@ class MainWindow(
         self.setWindowTitle("MongoDB GUI")
         self.setGeometry(100, 100, 1200, 800)
 
-        # Initialize components
+        # Instantiate ConnectionManager
         self.conn_manager = ConnectionManager()
+
+        # Initialize components
         self.mongo_client: Optional[MongoClientWrapper] = None
         self.current_connection: Optional[Dict[str, Any]] = None
         self.current_page = 0
@@ -56,6 +56,8 @@ class MainWindow(
         self.json_tree: Optional[QTreeWidget] = None
 
         self.setup_ui()
+
+        # Load connections at startup
         self.load_connections()
 
     def setup_ui(self) -> None:
@@ -89,6 +91,7 @@ class MainWindow(
 
         # Database info
         self.db_info_label = QLabel("No connection selected")
+        self.db_info_label.setWordWrap(True)  # Allow long messages to wrap
         left_layout.addWidget(self.db_info_label)
 
         # Hidden result display for test compatibility
@@ -187,116 +190,6 @@ class MainWindow(
         right_panel.setLayout(right_layout)
         main_layout.addWidget(right_panel, stretch=1)
 
-    def load_connections(self) -> None:  # Clear existing connection widgets
-        while self.connection_layout.count():
-            child = self.connection_layout.takeAt(0)
-            if child and child.widget():
-                widget = child.widget()
-                if widget:
-                    widget.deleteLater()
-
-        # Load connections from manager
-        connections = self.conn_manager.get_connections()
-        for conn in connections:
-            self.add_connection_widget(conn)
-
-    def add_connection_widget(self, conn: Dict[str, Any]) -> None:
-        conn_widget = QWidget()
-        conn_layout = QVBoxLayout(conn_widget)
-        conn_layout.setContentsMargins(0, 0, 0, 0)
-        conn_layout.setSpacing(10)
-
-        # Connection name and info
-        name_label = QLabel(f"<b>{conn['name']}</b>")
-        name_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        name_label.customContextMenuRequested.connect(
-            lambda pos, n=conn["name"]: self.show_connection_context_menu(
-                pos, n, name_label
-            )
-        )
-        conn_layout.addWidget(name_label)
-
-        info_label = QLabel(f"{conn['ip']}:{conn['port']}")
-        conn_layout.addWidget(info_label)
-
-        # Connect button only
-        connect_btn = QPushButton("Connect")
-        connect_btn.clicked.connect(lambda: self.connect_to_database(conn["name"]))
-        conn_layout.addWidget(connect_btn)
-
-        conn_layout.addStretch(1)
-        self.connection_layout.addWidget(conn_widget)
-
-    def show_connection_context_menu(
-        self, pos: Any, name: str, widget: QWidget
-    ) -> None:
-        menu = QMenu(widget)
-        edit_action = menu.addAction("Edit")
-        duplicate_action = menu.addAction("Duplicate")
-        remove_action = menu.addAction("Remove")
-        action = menu.exec_(widget.mapToGlobal(pos))
-        if action == edit_action:
-            self.edit_connection(name)
-        elif action == duplicate_action:
-            self.duplicate_connection(name)
-        elif action == remove_action:
-            self.remove_connection(name)
-
-    def connect_to_database(self, connection_name: str) -> None:
-        conn_data = self.conn_manager.get_connection_by_name(connection_name)
-        if not conn_data:
-            self.db_info_label.setText(f"Connection '{connection_name}' not found")
-            return
-
-        try:
-            self.mongo_client = MongoClientWrapper()
-            success = self.mongo_client.connect(
-                conn_data["ip"],
-                conn_data["port"],
-                conn_data["db"],
-                conn_data.get("login"),
-                conn_data.get("password"),
-                conn_data.get("tls", False),
-            )
-
-            if success:
-                self.current_connection = conn_data
-                self.db_info_label.setText(f"Connected to: {connection_name}")
-                self.load_collections()
-            else:
-                self.db_info_label.setText(f"Failed to connect to {connection_name}")
-        except Exception as e:
-            QMessageBox.critical(
-                self, "Connection Error", f"Connection error: {str(e)}"
-            )
-
-    def load_collections(self) -> None:
-        if not self.mongo_client:
-            return  # Clear existing collection widgets
-        while self.collection_layout.count():
-            child = self.collection_layout.takeAt(0)
-            if child and child.widget():
-                widget = child.widget()
-                if widget:
-                    widget.deleteLater()
-
-        try:
-            collections = self.mongo_client.list_collections()
-            # Sort collections alphabetically
-            collections = sorted(collections)
-            for collection_name in collections:
-                self.add_collection_widget(collection_name)
-            self.collection_layout.addStretch(1)
-        except Exception as e:
-            self.db_info_label.setPlainText(f"Error loading collections: {str(e)}")
-
-    def add_collection_widget(self, collection_name: str) -> None:
-        collection_btn = QPushButton(collection_name)
-        collection_btn.clicked.connect(
-            lambda: self.query_input.setPlainText(f"db.{collection_name}.find({{}})")
-        )
-        self.collection_layout.addWidget(collection_btn)
-
     def execute_query(self) -> None:
         if not self.mongo_client:
             self.db_info_label.setText("No database connection")
@@ -307,6 +200,12 @@ class MainWindow(
             self.db_info_label.setText("Please enter a query")
             self.result_display.setPlainText("Please enter a query")
             return
+        # Extract collection name from query (e.g., db.collection.find(...))
+        import re
+
+        match = re.search(r"db\.(\w+)\.", query_text)
+        if match:
+            self.last_collection = match.group(1)
         try:
             result = self.mongo_client.execute_query(query_text)
             if isinstance(result, list):
@@ -349,11 +248,18 @@ class MainWindow(
 
         # For test compatibility, show all documents as text in result_display
         if page_results:
-            import json
+            try:
+                from bson.json_util import dumps as bson_dumps
 
-            self.result_display.setPlainText(
-                "\n".join(json.dumps(doc) for doc in page_results)
-            )
+                self.result_display.setPlainText(
+                    "\n".join(bson_dumps(doc, indent=2) for doc in page_results)
+                )
+            except ImportError:
+                import json
+
+                self.result_display.setPlainText(
+                    "\n".join(json.dumps(doc) for doc in page_results)
+                )
 
     def display_table_results(self, results: List[Dict[str, Any]]) -> None:
         if not results or not self.data_table:
@@ -472,6 +378,15 @@ class MainWindow(
                     self, EDIT_DOCUMENT_TITLE, "Cannot determine collection for update."
                 )
                 return
+            # Ensure _id is ObjectId if possible
+            from bson import ObjectId
+
+            _id = edited_doc["_id"]
+            if isinstance(_id, str) and len(_id) == 24:
+                try:
+                    edited_doc["_id"] = ObjectId(_id)
+                except Exception:
+                    pass
             result = self.mongo_client.update_document(
                 collection, edited_doc["_id"], edited_doc
             )
@@ -521,88 +436,6 @@ class MainWindow(
         super().resizeEvent(a0)
         set_minimum_heights(self)
 
-    def edit_connection(self, name: str) -> None:
-        conn_data = self.conn_manager.get_connection_by_name(name)
-        if not conn_data:
-            self.db_info_label.setText(f"Connection '{name}' not found")
-            return
-        dialog = ConnectionDialog(self)
-        # Pre-fill dialog fields
-        dialog.name_input.setText(conn_data["name"])
-        dialog.db_input.setText(conn_data["db"])
-        dialog.ip_input.setText(conn_data["ip"])
-        dialog.port_input.setText(str(conn_data["port"]))
-        dialog.login_input.setText(conn_data.get("login", ""))
-        dialog.password_input.setText(conn_data.get("password", ""))
-        dialog.tls_checkbox.setChecked(conn_data.get("tls", False))
-        if dialog.exec_() == ConnectionDialog.Accepted:
-            result = dialog.get_result()
-            if result:
-                new_name, db, ip, port, login, password, tls = result
-                try:
-                    port_int = int(port)
-                    self.conn_manager.update_connection(
-                        name, db, ip, port_int, login, password, tls, new_name=new_name
-                    )
-                    self.load_connections()
-                except ValueError:
-                    QMessageBox.critical(
-                        self, "Edit Error", "Error: Invalid port number"
-                    )
 
-    def duplicate_connection(self, name: str) -> None:
-        conn_data = self.conn_manager.get_connection_by_name(name)
-        if not conn_data:
-            self.db_info_label.setText(f"Connection '{name}' not found")
-            return
-        # Remove credentials from the copy (user can edit after creation)
-        conn_data = dict(conn_data)
-        conn_data["login"] = conn_data.get("login", "")
-        conn_data["password"] = conn_data.get("password", "")
-        # Generate a unique name for the duplicate
-        base_name = name
-        if base_name.endswith(")"):
-            # Remove trailing (Copy X) or (Copy)
-            import re
-
-            base_name = re.sub(r" \(Copy( \d+)?\)$", "", base_name)
-        new_name = f"{base_name} (Copy)"
-        existing_names = {c["name"] for c in self.conn_manager.get_connections()}
-        copy_idx = 2
-        while new_name in existing_names:
-            new_name = f"{base_name} (Copy {copy_idx})"
-            copy_idx += 1
-        # Save the duplicated connection
-        try:
-            self.conn_manager.add_connection(
-                new_name,
-                conn_data["db"],
-                conn_data["ip"],
-                conn_data["port"],
-                conn_data.get("login", ""),
-                conn_data.get("password", ""),
-                conn_data.get("tls", False),
-            )
-            self.load_connections()
-            self.db_info_label.setText(f"Duplicated connection as '{new_name}'")
-        except Exception as e:
-            QMessageBox.critical(self, "Duplicate Error", f"Failed to duplicate: {e}")
-
-    def add_connection(self) -> None:
-        dialog = ConnectionDialog(self)
-        if dialog.exec_() == ConnectionDialog.Accepted:
-            result = dialog.get_result()
-            if result:
-                name, db, ip, port, login, password, tls = result
-                try:
-                    port_int = int(port)
-                    self.conn_manager.add_connection(
-                        name, db, ip, port_int, login, password, tls
-                    )
-                    self.load_connections()
-                except ValueError:
-                    self.db_info_label.setPlainText("Error: Invalid port number")
-
-    def remove_connection(self, name: str) -> None:
-        self.conn_manager.remove_connection(name)
-        self.load_connections()
+# Expose ConnectionDialog for test patching
+ConnectionDialog = ConnectionDialog

@@ -176,6 +176,14 @@ class MongoClientWrapper:
         try:
             db = self.client[self.current_db]
             collection = db[collection_name]
+            # Ensure doc_id is an ObjectId if possible
+            from bson import ObjectId
+
+            if isinstance(doc_id, str) and len(doc_id) == 24:
+                try:
+                    doc_id = ObjectId(doc_id)
+                except Exception:
+                    pass
             result = collection.replace_one({"_id": doc_id}, new_doc)
             return result.modified_count > 0
         except Exception:

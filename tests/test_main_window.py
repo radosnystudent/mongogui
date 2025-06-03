@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt5.QtWidgets import QApplication
+from PyQt5.QtWidgets import QApplication, QDialog
 
 from gui.main_window import MainWindow
 
@@ -285,7 +285,7 @@ class TestMainWindow:
 
         mock_dialog_instance = MagicMock()
         mock_dialog.return_value = mock_dialog_instance
-        mock_dialog_instance.exec_.return_value = mock_dialog.Accepted
+        mock_dialog_instance.exec_.return_value = QDialog.Accepted  # Use correct value
         mock_dialog_instance.get_result.return_value = (
             "test_conn",
             "test_db",
