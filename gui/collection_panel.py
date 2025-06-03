@@ -30,8 +30,8 @@ class CollectionPanelMixin:
         except Exception as e:
             # Use print as fallback if db_info_label is not present or not a QLabel
             label = getattr(self, "db_info_label", None)
-            if label and hasattr(label, "setPlainText"):
-                label.setPlainText(f"Error loading collections: {str(e)}")
+            if label:
+                label.setText(f"Error loading collections: {str(e)}")
             else:
                 print(f"Error loading collections: {str(e)}")
 

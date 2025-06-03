@@ -53,8 +53,8 @@ class QueryPanelMixin:
 
     def _set_db_info_label(self, text: str) -> None:
         label = getattr(self, "db_info_label", None)
-        if label and hasattr(label, "setPlainText"):
-            label.setPlainText(text)
+        if label and hasattr(label, "setText"):
+            label.setText(text)
 
     def display_results(self) -> None:
         if not self.results:

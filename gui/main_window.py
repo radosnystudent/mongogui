@@ -201,7 +201,6 @@ class MainWindow(
             self.result_display.setPlainText("Please enter a query")
             return
         # Extract collection name from query (e.g., db.collection.find(...))
-        import re
 
         match = re.search(r"db\.(\w+)\.", query_text)
         if match:
@@ -438,4 +437,3 @@ class MainWindow(
 
 
 # Expose ConnectionDialog for test patching
-ConnectionDialog = ConnectionDialog
