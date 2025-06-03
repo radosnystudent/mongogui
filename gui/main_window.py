@@ -1,5 +1,5 @@
 import re
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Callable, Dict, List, Optional, Set
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -30,6 +30,14 @@ from gui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
 from gui.edit_document_dialog import EditDocumentDialog
 from gui.query_panel import QueryPanelMixin
 from gui.ui_utils import set_minimum_heights
+
+bson_dumps: Optional[Callable[..., str]]
+try:
+    from bson.json_util import dumps as _bson_dumps
+
+    bson_dumps = _bson_dumps
+except ImportError:
+    bson_dumps = None
 
 
 class MainWindow(
@@ -247,13 +255,11 @@ class MainWindow(
 
         # For test compatibility, show all documents as text in result_display
         if page_results:
-            try:
-                from bson.json_util import dumps as bson_dumps
-
+            if bson_dumps is not None:
                 self.result_display.setPlainText(
                     "\n".join(bson_dumps(doc, indent=2) for doc in page_results)
                 )
-            except ImportError:
+            else:
                 import json
 
                 self.result_display.setPlainText(
