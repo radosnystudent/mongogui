@@ -1,9 +1,19 @@
-from PyQt5.QtWidgets import QDialog, QVBoxLayout, QTextEdit, QPushButton, QHBoxLayout, QMessageBox
-from PyQt5.QtCore import Qt
 import json
+from typing import Optional
+
+from PyQt5.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QMessageBox,
+    QPushButton,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
 
 class EditDocumentDialog(QDialog):
-    def __init__(self, document: dict, parent=None):
+    def __init__(self, document: dict, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Edit Document")
         self.setMinimumSize(600, 400)
@@ -24,9 +34,14 @@ class EditDocumentDialog(QDialog):
         self.save_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
 
-    def get_edited_document(self):
+    def get_edited_document(self) -> Optional[dict]:
         try:
-            return json.loads(self.text_edit.toPlainText())
+            self._edited_doc = json.loads(self.text_edit.toPlainText())
         except Exception as e:
             QMessageBox.critical(self, "Invalid JSON", f"Error parsing JSON: {e}")
             return None
+        return (
+            self._edited_doc
+            if isinstance(self._edited_doc, dict) or self._edited_doc is None
+            else None
+        )

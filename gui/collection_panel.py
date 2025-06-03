@@ -1,13 +1,15 @@
 from typing import TYPE_CHECKING, Any
+
 from PyQt5.QtWidgets import QPushButton
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QVBoxLayout, QTextEdit
+    from PyQt5.QtWidgets import QTextEdit, QVBoxLayout
+
 
 class CollectionPanelMixin:
-    collection_layout: 'QVBoxLayout'
+    collection_layout: "QVBoxLayout"
     mongo_client: Any
-    result_display: 'QTextEdit'
+    result_display: "QTextEdit"
     query_input: Any
 
     def load_collections(self) -> None:

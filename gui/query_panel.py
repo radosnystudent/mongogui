@@ -1,12 +1,14 @@
-from typing import Any, Dict, List, Set, TYPE_CHECKING
-from PyQt5.QtWidgets import QTableWidget, QTableWidgetItem, QTextEdit
+from typing import TYPE_CHECKING, Any, Dict, List, Set
+
+from PyQt5.QtWidgets import QTableWidgetItem, QTextEdit, QTreeWidgetItem
 
 if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QPushButton, QLabel
+    pass
+
 
 class QueryPanelMixin:
     mongo_client: Any
-    result_display: 'QTextEdit'
+    result_display: "QTextEdit"
     query_input: Any
     data_table: Any
     prev_btn: Any
@@ -44,9 +46,9 @@ class QueryPanelMixin:
             self.result_display.setPlainText("No results")
             if self.data_table:
                 self.data_table.setRowCount(0)
-            if getattr(self, 'json_tree', None):
-                self.json_tree.clear()  # type: ignore
-                self.json_tree.hide()  # type: ignore
+            if getattr(self, "json_tree", None):
+                self.json_tree.clear()
+                self.json_tree.hide()
             return
         start_idx = self.current_page * self.page_size
         end_idx = min(start_idx + self.page_size, len(self.results))
@@ -59,17 +61,16 @@ class QueryPanelMixin:
         )
         self.display_table_results(page_results)
         # Show JSON tree view
-        if getattr(self, 'json_tree', None):
-            self.json_tree.clear()  # type: ignore
+        if getattr(self, "json_tree", None):
+            self.json_tree.clear()
             for idx, doc in enumerate(page_results, start=start_idx + 1):
                 doc_item = self._add_tree_item(f"Document {idx}", doc)
-                self.json_tree.addTopLevelItem(doc_item)  # type: ignore
-            self.json_tree.expandToDepth(1)  # type: ignore
-            self.json_tree.show()  # type: ignore
+                self.json_tree.addTopLevelItem(doc_item)
+            self.json_tree.expandToDepth(1)
+            self.json_tree.show()
         self.result_display.hide()
 
-    def _add_tree_item(self, key, value):
-        from PyQt5.QtWidgets import QTreeWidgetItem
+    def _add_tree_item(self, key: str, value: Any) -> QTreeWidgetItem:
         if isinstance(value, dict):
             item = QTreeWidgetItem([str(key), ""])
             for k, v in value.items():

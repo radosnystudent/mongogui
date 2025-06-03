@@ -1,15 +1,18 @@
-from typing import Any, Dict, TYPE_CHECKING
-from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLabel, QPushButton, QMenu
+from typing import TYPE_CHECKING, Any, Dict
+
 from PyQt5.QtCore import Qt
+from PyQt5.QtWidgets import QLabel, QMenu, QPushButton, QVBoxLayout, QWidget
+
 from gui.connection_dialog import ConnectionDialog
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QTextEdit
 
+
 class ConnectionWidgetsMixin:
-    connection_layout: 'QVBoxLayout'
+    connection_layout: "QVBoxLayout"
     conn_manager: Any
-    result_display: 'QTextEdit'
+    result_display: "QTextEdit"
     mongo_client: Any
     query_input: Any
     data_table: Any
@@ -41,7 +44,9 @@ class ConnectionWidgetsMixin:
         name_label = QLabel(f"<b>{conn['name']}</b>")
         name_label.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         name_label.customContextMenuRequested.connect(
-            lambda pos, n=conn["name"]: self.show_connection_context_menu(pos, n, name_label)
+            lambda pos, n=conn["name"]: self.show_connection_context_menu(
+                pos, n, name_label
+            )
         )
         conn_layout.addWidget(name_label)
         info_label = QLabel(f"{conn['ip']}:{conn['port']}")
@@ -52,7 +57,9 @@ class ConnectionWidgetsMixin:
         conn_layout.addStretch(1)
         self.connection_layout.addWidget(conn_widget)
 
-    def show_connection_context_menu(self, pos, name, widget):
+    def show_connection_context_menu(
+        self, pos: Any, name: str, widget: QWidget
+    ) -> None:
         menu = QMenu(widget)
         edit_action = menu.addAction("Edit")
         duplicate_action = menu.addAction("Duplicate")
@@ -76,6 +83,7 @@ class ConnectionWidgetsMixin:
         base_name = name
         if base_name.endswith(")"):
             import re
+
             base_name = re.sub(r" \(Copy( \d+)?\)$", "", base_name)
         new_name = f"{base_name} (Copy)"
         existing_names = {c["name"] for c in self.conn_manager.get_connections()}
