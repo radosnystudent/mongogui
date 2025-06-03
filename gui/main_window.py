@@ -1,3 +1,4 @@
+import re
 from typing import Any, Dict, List, Optional, Set
 
 from PyQt5.QtCore import Qt
@@ -24,7 +25,6 @@ from PyQt5.QtWidgets import (
 from core.connection_manager import ConnectionManager
 from core.mongo_client import MongoClientWrapper
 from gui.collection_panel import CollectionPanelMixin
-from gui.connection_dialog import ConnectionDialog  # Add this import for test patching
 from gui.connection_widgets import ConnectionWidgetsMixin
 from gui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
 from gui.edit_document_dialog import EditDocumentDialog
@@ -377,15 +377,10 @@ class MainWindow(
                     self, EDIT_DOCUMENT_TITLE, "Cannot determine collection for update."
                 )
                 return
-            # Ensure _id is ObjectId if possible
-            from bson import ObjectId
+            # Convert _id to ObjectId if possible
+            from core.utils import convert_to_object_id
 
-            _id = edited_doc["_id"]
-            if isinstance(_id, str) and len(_id) == 24:
-                try:
-                    edited_doc["_id"] = ObjectId(_id)
-                except Exception:
-                    pass
+            edited_doc["_id"] = convert_to_object_id(edited_doc["_id"])
             result = self.mongo_client.update_document(
                 collection, edited_doc["_id"], edited_doc
             )

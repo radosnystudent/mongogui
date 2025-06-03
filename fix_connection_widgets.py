@@ -1,4 +1,10 @@
-from typing import TYPE_CHECKING, Any, Dict
+"""
+Fix connection_widgets.py file by replacing it with a corrected version.
+"""
+
+import os
+
+fixed_content = r"""from typing import TYPE_CHECKING, Any, Dict
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import QDialog, QLabel, QMenu, QPushButton, QVBoxLayout, QWidget
@@ -80,7 +86,7 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
         if not conn_data:
             self.result_display.setPlainText(f"Connection '{name}' not found")
             return
-        dialog = ConnectionDialog(None)
+        dialog = ConnectionDialog(self)
         dialog.name_input.setText(conn_data["name"])
         dialog.db_input.setText(conn_data["db"])
         dialog.ip_input.setText(conn_data["ip"])
@@ -136,7 +142,7 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
             self.result_display.setPlainText(f"Failed to duplicate: {e}")
 
     def add_connection(self) -> None:
-        dialog = ConnectionDialog(None)
+        dialog = ConnectionDialog(self)
         if dialog.exec_() == QDialog.Accepted:
             result = dialog.get_result()
             if result:
@@ -192,3 +198,9 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
             if label:
                 label.setText(f"Connection error: {str(e)}")
             self.result_display.setPlainText(f"Connection error: {str(e)}")
+"""
+
+filepath = os.path.join("gui", "connection_widgets.py")
+with open(filepath, "w") as f:
+    f.write(fixed_content)
+print(f"Fixed {filepath} successfully!")
