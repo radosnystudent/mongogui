@@ -284,7 +284,7 @@ class TestMainWindow:
         mock_conn_manager.return_value = mock_conn_manager_instance
         mock_dialog_instance = MagicMock()
         mock_dialog.return_value = mock_dialog_instance
-        mock_dialog_instance.exec_.return_value = 1  # QDialog.Accepted
+        mock_dialog_instance.exec_.return_value = QDialog.Accepted
         mock_dialog_instance.get_result.return_value = (
             "test_conn",
             "test_db",

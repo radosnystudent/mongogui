@@ -165,7 +165,6 @@ class QueryPanelMixin:
             doc_item.setExpanded(False)
             doc_item.setData(0, int(Qt.ItemDataRole.UserRole), doc)
         self.json_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.json_tree.customContextMenuRequested.connect(self.show_tree_context_menu)
 
     def show_tree_context_menu(self, pos: Any) -> None:
         if not self.json_tree:
