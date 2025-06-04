@@ -3,6 +3,8 @@ from typing import Any, Dict, List, Optional, Union
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
+from core.utils import convert_to_object_id
+
 NOT_CONNECTED_MSG = "Not connected to database"
 
 
@@ -176,6 +178,9 @@ class MongoClientWrapper:
         try:
             db = self.client[self.current_db]
             collection = db[collection_name]
+
+            # Convert doc_id to ObjectId if possible
+            doc_id = convert_to_object_id(doc_id)
             result = collection.replace_one({"_id": doc_id}, new_doc)
             return result.modified_count > 0
         except Exception:

@@ -1,15 +1,17 @@
 from typing import TYPE_CHECKING, Any, Dict
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QLabel, QMenu, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import QDialog, QLabel, QMenu, QPushButton, QVBoxLayout, QWidget
 
+from core.mongo_client import MongoClientWrapper
+from gui.collection_panel import CollectionPanelMixin
 from gui.connection_dialog import ConnectionDialog
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QTextEdit
 
 
-class ConnectionWidgetsMixin:
+class ConnectionWidgetsMixin(CollectionPanelMixin):
     connection_layout: "QVBoxLayout"
     conn_manager: Any
     result_display: "QTextEdit"
@@ -24,6 +26,14 @@ class ConnectionWidgetsMixin:
     next_btn: Any
     page_label: Any
     result_count_label: Any
+    db_info_label: Any  # Ensure this is always present
+
+    def _set_db_info_label(self, text: str) -> None:
+        """Set text in both db_info_label and result_display for compatibility."""
+        if hasattr(self, "db_info_label") and self.db_info_label:
+            self.db_info_label.setText(text)
+        if hasattr(self, "result_display") and self.result_display:
+            self.result_display.setPlainText(text)
 
     def load_connections(self) -> None:
         while self.connection_layout.count():
@@ -49,12 +59,13 @@ class ConnectionWidgetsMixin:
             )
         )
         conn_layout.addWidget(name_label)
-        info_label = QLabel(f"{conn['ip']}:{conn['port']}")
-        conn_layout.addWidget(info_label)
+        details = QLabel(
+            f"{conn['db']}@{conn['ip']}:{conn['port']}{' (TLS)' if conn.get('tls', False) else ''}"
+        )
+        conn_layout.addWidget(details)
         connect_btn = QPushButton("Connect")
-        connect_btn.clicked.connect(lambda: self.connect_to_database(conn["name"]))  # type: ignore
+        connect_btn.clicked.connect(lambda: self.connect_to_database(conn["name"]))
         conn_layout.addWidget(connect_btn)
-        conn_layout.addStretch(1)
         self.connection_layout.addWidget(conn_widget)
 
     def show_connection_context_menu(
@@ -64,7 +75,9 @@ class ConnectionWidgetsMixin:
         edit_action = menu.addAction("Edit")
         duplicate_action = menu.addAction("Duplicate")
         remove_action = menu.addAction("Remove")
+
         action = menu.exec_(widget.mapToGlobal(pos))
+
         if action == edit_action:
             self.edit_connection(name)
         elif action == duplicate_action:
@@ -72,61 +85,12 @@ class ConnectionWidgetsMixin:
         elif action == remove_action:
             self.remove_connection(name)
 
-    def duplicate_connection(self, name: str) -> None:
-        conn_data = self.conn_manager.get_connection_by_name(name)
-        if not conn_data:
-            self.result_display.setPlainText(f"Connection '{name}' not found")
-            return
-        conn_data = dict(conn_data)
-        conn_data["login"] = conn_data.get("login", "")
-        conn_data["password"] = conn_data.get("password", "")
-        base_name = name
-        if base_name.endswith(")"):
-            import re
-
-            base_name = re.sub(r" \(Copy( \d+)?\)$", "", base_name)
-        new_name = f"{base_name} (Copy)"
-        existing_names = {c["name"] for c in self.conn_manager.get_connections()}
-        copy_idx = 2
-        while new_name in existing_names:
-            new_name = f"{base_name} (Copy {copy_idx})"
-            copy_idx += 1
-        try:
-            self.conn_manager.add_connection(
-                new_name,
-                conn_data["db"],
-                conn_data["ip"],
-                conn_data["port"],
-                conn_data.get("login", ""),
-                conn_data.get("password", ""),
-                conn_data.get("tls", False),
-            )
-            self.load_connections()
-            self.result_display.setPlainText(f"Duplicated connection as '{new_name}'")
-        except Exception as e:
-            self.result_display.setPlainText(f"Failed to duplicate: {e}")
-
-    def add_connection(self) -> None:
-        dialog = ConnectionDialog(self)  # type: ignore
-        if dialog.exec_() == ConnectionDialog.Accepted:
-            result = dialog.get_result()
-            if result:
-                name, db, ip, port, login, password, tls = result
-                try:
-                    port_int = int(port)
-                    self.conn_manager.add_connection(
-                        name, db, ip, port_int, login, password, tls
-                    )
-                    self.load_connections()
-                except ValueError:
-                    self.result_display.setPlainText("Error: Invalid port number")
-
     def edit_connection(self, name: str) -> None:
         conn_data = self.conn_manager.get_connection_by_name(name)
         if not conn_data:
-            self.result_display.setPlainText(f"Connection '{name}' not found")
+            self._set_db_info_label(f"Connection '{name}' not found")
             return
-        dialog = ConnectionDialog(self)  # type: ignore
+        dialog = ConnectionDialog(None)
         dialog.name_input.setText(conn_data["name"])
         dialog.db_input.setText(conn_data["db"])
         dialog.ip_input.setText(conn_data["ip"])
@@ -134,19 +98,91 @@ class ConnectionWidgetsMixin:
         dialog.login_input.setText(conn_data.get("login", ""))
         dialog.password_input.setText(conn_data.get("password", ""))
         dialog.tls_checkbox.setChecked(conn_data.get("tls", False))
-        if dialog.exec_() == ConnectionDialog.Accepted:
-            result = dialog.get_result()
-            if result:
-                new_name, db, ip, port, login, password, tls = result
-                try:
-                    port_int = int(port)
-                    self.conn_manager.update_connection(
-                        name, db, ip, port_int, login, password, tls, new_name=new_name
-                    )
-                    self.load_connections()
-                except ValueError:
-                    self.result_display.setPlainText("Error: Invalid port number")
+        if dialog.exec_() == QDialog.Accepted:
+            updated_data = dialog.get_connection_data()
+            try:
+                self.conn_manager.update_connection(
+                    name,
+                    updated_data["db"],
+                    updated_data["ip"],
+                    updated_data["port"],
+                    updated_data.get("login"),
+                    updated_data.get("password"),
+                    updated_data.get("tls", False),
+                )
+                self._set_db_info_label(f"Updated connection: {updated_data['name']}")
+                self.load_connections()
+            except Exception as e:
+                self._set_db_info_label(f"Error updating connection: {e}")
+
+    def add_connection(self) -> None:
+        dialog = ConnectionDialog(None)
+        if dialog.exec_() == QDialog.Accepted:
+            conn_data = dialog.get_connection_data()
+            try:
+                self.conn_manager.add_connection(conn_data)
+                self._set_db_info_label(f"Added connection: {conn_data['name']}")
+                self.load_connections()
+            except Exception as e:
+                self._set_db_info_label(f"Error adding connection: {e}")
+
+    def duplicate_connection(self, name: str) -> None:
+        conn_data = self.conn_manager.get_connection_by_name(name)
+        if not conn_data:
+            self._set_db_info_label(f"Connection '{name}' not found")
+            return
+        try:
+            new_name = f"{name}_copy"
+            counter = 1
+            while self.conn_manager.get_connection_by_name(new_name):
+                new_name = f"{name}_copy_{counter}"
+                counter += 1
+            conn_data_copy = conn_data.copy()
+            conn_data_copy["name"] = new_name
+            self.conn_manager.add_connection(conn_data_copy)
+            self._set_db_info_label(f"Duplicated connection as '{new_name}'")
+            self.load_connections()
+        except Exception as e:
+            self._set_db_info_label(f"Failed to duplicate: {e}")
+
+    def edit_and_connect(self) -> None:
+        dialog = ConnectionDialog(None)
+        if dialog.exec_() == QDialog.Accepted:
+            conn_data = dialog.get_connection_data()
+            try:
+                self.conn_manager.add_connection(conn_data)
+                self._set_db_info_label(f"Added connection: {conn_data['name']}")
+                self.load_connections()
+                self.connect_to_database(conn_data["name"])
+            except ValueError:
+                self._set_db_info_label("Error: Invalid port number")
 
     def remove_connection(self, name: str) -> None:
         self.conn_manager.remove_connection(name)
         self.load_connections()
+
+    def connect_to_database(self, connection_name: str) -> None:
+        conn_data = self.conn_manager.get_connection_by_name(connection_name)
+        if not conn_data:
+            self._set_db_info_label(f"Connection '{connection_name}' not found")
+            return
+        try:
+            self.mongo_client = MongoClientWrapper()
+            success = self.mongo_client.connect(
+                conn_data["ip"],
+                conn_data["port"],
+                conn_data["db"],
+                conn_data.get("login"),
+                conn_data.get("password"),
+                conn_data.get("tls", False),
+            )
+            if success:
+                self.current_connection = conn_data
+                self._set_db_info_label(
+                    f"Connected: {connection_name} ({conn_data['db']}@{conn_data['ip']}:{conn_data['port']})"
+                )
+                self.load_collections()
+            else:
+                self._set_db_info_label(f"Failed to connect to {connection_name}")
+        except Exception as e:
+            self._set_db_info_label(f"Connection error: {str(e)}")

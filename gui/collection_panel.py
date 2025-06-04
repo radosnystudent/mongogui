@@ -23,10 +23,17 @@ class CollectionPanelMixin:
                     widget.deleteLater()
         try:
             collections = self.mongo_client.list_collections()
+            collections = sorted(collections)
             for collection_name in collections:
                 self.add_collection_widget(collection_name)
+            self.collection_layout.addStretch(1)
         except Exception as e:
-            self.result_display.setPlainText(f"Error loading collections: {str(e)}")
+            # Use print as fallback if db_info_label is not present or not a QLabel
+            label = getattr(self, "db_info_label", None)
+            if label:
+                label.setText(f"Error loading collections: {str(e)}")
+            else:
+                print(f"Error loading collections: {str(e)}")
 
     def add_collection_widget(self, collection_name: str) -> None:
         collection_btn = QPushButton(collection_name)

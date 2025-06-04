@@ -24,6 +24,7 @@ show_help() {
     echo -e "  ${CYAN}build${NC}          Build the package"
     echo -e "  ${CYAN}clean${NC}          Clean build artifacts"
     echo -e "  ${CYAN}all${NC}            Run all checks"
+    echo -e "  ${CYAN}all-checks${NC}     Run lint, mypy, format-check, and tests"
     echo -e "  ${CYAN}dev-setup${NC}      Set up development environment"
     echo ""
     echo -e "${YELLOW}Usage: ./scripts/dev.sh <command>${NC}"
@@ -121,6 +122,15 @@ run_all() {
     run_tests
 }
 
+# Function to run all static checks and tests
+all_checks() {
+    echo -e "${GREEN}Running all static checks and tests...${NC}"
+    lint_code
+    type_check
+    check_format
+    run_tests
+}
+
 # Function to set up development environment
 dev_setup() {
     echo -e "${GREEN}Setting up development environment...${NC}"
@@ -183,6 +193,9 @@ case "${1:-help}" in
         ;;
     "all")
         run_all
+        ;;
+    "all-checks")
+        all_checks
         ;;
     "dev-setup")
         dev_setup
