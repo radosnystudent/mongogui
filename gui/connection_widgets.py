@@ -101,7 +101,15 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
         if dialog.exec_() == QDialog.Accepted:
             updated_data = dialog.get_connection_data()
             try:
-                self.conn_manager.update_connection(name, updated_data)
+                self.conn_manager.update_connection(
+                    name,
+                    updated_data["db"],
+                    updated_data["ip"],
+                    updated_data["port"],
+                    updated_data.get("login"),
+                    updated_data.get("password"),
+                    updated_data.get("tls", False),
+                )
                 self._set_db_info_label(f"Updated connection: {updated_data['name']}")
                 self.load_connections()
             except Exception as e:

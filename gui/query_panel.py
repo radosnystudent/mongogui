@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Set
+from typing import Any, Callable, Dict, List, Set
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -104,29 +104,36 @@ class QueryPanelMixin:
         else:
             return QTreeWidgetItem([str(key), str(value)])
 
+    def _setup_context_menu_signal(
+        self,
+        widget: str,
+        signal_name: str,
+        handler: Callable[[Any], None],
+        flag_name: str,
+    ) -> None:
+        if not hasattr(self, widget) or getattr(self, widget) is None:
+            return
+        w = getattr(self, widget)
+        w.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        if getattr(self, flag_name, False):
+            getattr(w, signal_name).disconnect(handler)
+        getattr(w, signal_name).connect(handler)
+        setattr(self, flag_name, True)
+
     def setup_query_panel_signals(self) -> None:
         """Connect context menu signals for table and tree widgets, ensuring old signals are disconnected."""
-        if hasattr(self, "data_table") and self.data_table:
-            self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-            if getattr(self, "_table_signals_connected", False):
-                self.data_table.customContextMenuRequested.disconnect(
-                    self.show_table_context_menu
-                )
-            self.data_table.customContextMenuRequested.connect(
-                self.show_table_context_menu
-            )
-            self._table_signals_connected = True
-
-        if hasattr(self, "json_tree") and self.json_tree:
-            self.json_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-            if getattr(self, "_tree_signals_connected", False):
-                self.json_tree.customContextMenuRequested.disconnect(
-                    self.show_tree_context_menu
-                )
-            self.json_tree.customContextMenuRequested.connect(
-                self.show_tree_context_menu
-            )
-            self._tree_signals_connected = True
+        self._setup_context_menu_signal(
+            "data_table",
+            "customContextMenuRequested",
+            self.show_table_context_menu,
+            "_table_signals_connected",
+        )
+        self._setup_context_menu_signal(
+            "json_tree",
+            "customContextMenuRequested",
+            self.show_tree_context_menu,
+            "_tree_signals_connected",
+        )
 
     def display_table_results(self, results: List[Dict[str, Any]]) -> None:
         if not results or not self.data_table:
