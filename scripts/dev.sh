@@ -151,7 +151,7 @@ dev_setup() {
 }
 
 # Main script logic
-case "$1" in
+case "${1:-help}" in
     "help")
         show_help
         ;;
