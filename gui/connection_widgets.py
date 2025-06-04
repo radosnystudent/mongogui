@@ -133,6 +133,10 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
             return
         try:
             new_name = f"{name}_copy"
+            counter = 1
+            while self.conn_manager.get_connection_by_name(new_name):
+                new_name = f"{name}_copy_{counter}"
+                counter += 1
             conn_data_copy = conn_data.copy()
             conn_data_copy["name"] = new_name
             self.conn_manager.add_connection(conn_data_copy)
