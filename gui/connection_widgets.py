@@ -71,7 +71,7 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
     def show_connection_context_menu(
         self, pos: Any, name: str, widget: QWidget
     ) -> None:
-        menu = QMenu()
+        menu = QMenu(widget)
         edit_action = menu.addAction("Edit")
         duplicate_action = menu.addAction("Duplicate")
         remove_action = menu.addAction("Remove")

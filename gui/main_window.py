@@ -214,7 +214,7 @@ class MainWindow(
             return
         # Extract collection name from query (e.g., db.collection.find(...))
 
-        match = re.search(r"db\.(\w+)\.", query_text)
+        match = re.search(r"db\.([a-zA-Z0-9_\-.$]+)\.", query_text)
         if match:
             self.last_collection = match.group(1)
         try:
