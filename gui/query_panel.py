@@ -31,6 +31,8 @@ class QueryPanelMixin:
     last_query: str
     last_collection: str
     json_tree: Any
+    _table_signals_connected: bool = False
+    _tree_signals_connected: bool = False
 
     def execute_query(self) -> None:
         if not self.mongo_client:
@@ -58,6 +60,7 @@ class QueryPanelMixin:
             label.setText(text)
 
     def display_results(self) -> None:
+        self.setup_query_panel_signals()  # Ensure context menus are always connected
         if not self.results:
             if self.data_table:
                 self.data_table.setRowCount(0)
@@ -101,6 +104,30 @@ class QueryPanelMixin:
         else:
             return QTreeWidgetItem([str(key), str(value)])
 
+    def setup_query_panel_signals(self) -> None:
+        """Connect context menu signals for table and tree widgets, ensuring old signals are disconnected."""
+        if hasattr(self, "data_table") and self.data_table:
+            self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            if getattr(self, "_table_signals_connected", False):
+                self.data_table.customContextMenuRequested.disconnect(
+                    self.show_table_context_menu
+                )
+            self.data_table.customContextMenuRequested.connect(
+                self.show_table_context_menu
+            )
+            self._table_signals_connected = True
+
+        if hasattr(self, "json_tree") and self.json_tree:
+            self.json_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            if getattr(self, "_tree_signals_connected", False):
+                self.json_tree.customContextMenuRequested.disconnect(
+                    self.show_tree_context_menu
+                )
+            self.json_tree.customContextMenuRequested.connect(
+                self.show_tree_context_menu
+            )
+            self._tree_signals_connected = True
+
     def display_table_results(self, results: List[Dict[str, Any]]) -> None:
         if not results or not self.data_table:
             return
@@ -112,8 +139,6 @@ class QueryPanelMixin:
         self.data_table.setRowCount(len(results))
         self.data_table.setHorizontalHeaderLabels(columns)
         self.data_table.setSelectionBehavior(QAbstractItemView.SelectRows)
-        self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.data_table.customContextMenuRequested.connect(self.show_table_context_menu)
         self._table_row_docs = []
         for row, doc in enumerate(results):
             self._table_row_docs.append(doc)
@@ -166,7 +191,6 @@ class QueryPanelMixin:
             doc_item.setExpanded(False)
             doc_item.setData(0, int(Qt.ItemDataRole.UserRole), doc)
         self.json_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.json_tree.customContextMenuRequested.connect(self.show_tree_context_menu)
 
     def show_tree_context_menu(self, pos: Any) -> None:
         if not self.json_tree:

@@ -1,3 +1,4 @@
+import json
 import re
 from typing import Any, Callable, Dict, List, Optional, Set
 
@@ -8,7 +9,6 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QMainWindow,
-    QMenu,
     QMessageBox,
     QPushButton,
     QScrollArea,
@@ -24,9 +24,10 @@ from PyQt5.QtWidgets import (
 
 from core.connection_manager import ConnectionManager
 from core.mongo_client import MongoClientWrapper
+from core.utils import convert_to_object_id  # Moved import to top
 from gui.collection_panel import CollectionPanelMixin
 from gui.connection_widgets import ConnectionWidgetsMixin
-from gui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
+from gui.constants import EDIT_DOCUMENT_TITLE
 from gui.edit_document_dialog import EditDocumentDialog
 from gui.query_panel import QueryPanelMixin
 from gui.ui_utils import set_minimum_heights
@@ -192,6 +193,9 @@ class MainWindow(
         results_splitter.addWidget(self.json_tree)
         self.json_tree.hide()
 
+        # Connect context menu signals only once
+        self.setup_query_panel_signals()
+
         results_splitter.setSizes([400, 200])
         right_layout.addWidget(results_splitter, stretch=1)
 
@@ -260,8 +264,6 @@ class MainWindow(
                     "\n".join(bson_dumps(doc, indent=2) for doc in page_results)
                 )
             else:
-                import json
-
                 self.result_display.setPlainText(
                     "\n".join(json.dumps(doc) for doc in page_results)
                 )
@@ -279,7 +281,6 @@ class MainWindow(
         self.data_table.setHorizontalHeaderLabels(columns)
         self.data_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.data_table.customContextMenuRequested.connect(self.show_table_context_menu)
 
         self._table_row_docs = []  # Store docs for context menu
         for row, doc in enumerate(results):
@@ -287,35 +288,6 @@ class MainWindow(
             for col, key in enumerate(columns):
                 value = doc.get(key, "")
                 self.data_table.setItem(row, col, QTableWidgetItem(str(value)))
-
-    def show_table_context_menu(self, pos: Any) -> None:
-        if not self.data_table:
-            return
-        index = self.data_table.indexAt(pos)
-        if not index.isValid():
-            return
-        doc = (
-            self._table_row_docs[index.row()]
-            if hasattr(self, "_table_row_docs")
-            and index.row() < len(self._table_row_docs)
-            else None
-        )
-        if doc:
-            menu = QMenu(self.data_table)
-            edit_action = menu.addAction(EDIT_DOCUMENT_ACTION)
-            viewport = (
-                self.data_table.viewport()
-                if hasattr(self.data_table, "viewport")
-                else None
-            )
-            global_pos = (
-                viewport.mapToGlobal(pos)
-                if viewport
-                else self.data_table.mapToGlobal(pos)
-            )
-            action = menu.exec_(global_pos)
-            if action == edit_action:
-                self.edit_document(doc)
 
     def display_tree_results(self, results: List[Dict[str, Any]]) -> None:
         if not self.json_tree:
@@ -333,31 +305,6 @@ class MainWindow(
             doc_item.setExpanded(False)
             # Store doc in item using setData with Qt.ItemDataRole
             doc_item.setData(0, int(Qt.ItemDataRole.UserRole), doc)
-        self.json_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
-        self.json_tree.customContextMenuRequested.connect(self.show_tree_context_menu)
-
-    def show_tree_context_menu(self, pos: Any) -> None:
-        if not self.json_tree:
-            return
-        item = self.json_tree.itemAt(pos)
-        if item and item.parent() is None:  # Only top-level items
-            menu = QMenu(self.json_tree)
-            edit_action = menu.addAction(EDIT_DOCUMENT_ACTION)
-            viewport = (
-                self.json_tree.viewport()
-                if hasattr(self.json_tree, "viewport")
-                else None
-            )
-            global_pos = (
-                viewport.mapToGlobal(pos)
-                if viewport
-                else self.json_tree.mapToGlobal(pos)
-            )
-            action = menu.exec_(global_pos)
-            if action == edit_action:
-                doc = item.data(0, int(Qt.ItemDataRole.UserRole))
-                if doc:
-                    self.edit_document(doc)
 
     def edit_document(self, document: dict) -> None:
         dialog = EditDocumentDialog(document, self)
@@ -384,8 +331,6 @@ class MainWindow(
                 )
                 return
             # Convert _id to ObjectId if possible
-            from core.utils import convert_to_object_id
-
             edited_doc["_id"] = convert_to_object_id(edited_doc["_id"])
             result = self.mongo_client.update_document(
                 collection, edited_doc["_id"], edited_doc
