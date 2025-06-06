@@ -290,3 +290,50 @@ class QueryPanelMixin:
         if (self.current_page + 1) * self.page_size < len(self.results):
             self.current_page += 1
             self.display_results()
+
+    def execute_explain(self) -> None:
+        """Run the current query with explain and display the plan."""
+        if not self.mongo_client:
+            self._set_db_info_label("No database connection")
+            return
+        query_text = self.query_input.toPlainText().strip()
+        if not query_text:
+            self._set_db_info_label("Please enter a query")
+            return
+        try:
+            result = self.mongo_client.execute_query(query_text, explain=True)
+            self.display_explain_result(result)
+        except Exception as e:
+            self._set_db_info_label(f"Explain error: {str(e)}")
+
+    def display_explain_result(self, result: Any) -> None:
+        """Display the explain plan as a tree in the Results section and hide the result_display box."""
+        if not self.json_tree:
+            return
+        self.json_tree.clear()
+        self.json_tree.show()
+        self.result_display.hide()  # Always hide the array/text box for explain
+        if isinstance(result, dict):
+            root_item = QTreeWidgetItem(self.json_tree, ["Explain Plan", ""])
+            self._add_tree_item_to_tree(root_item, result)
+            root_item.setExpanded(True)
+        else:
+            QTreeWidgetItem(self.json_tree, ["Result", str(result)])
+
+    def _add_tree_item_to_tree(self, parent: QTreeWidgetItem, value: Any) -> None:
+        # Refactored to reduce cognitive complexity
+        if isinstance(value, dict):
+            for k, v in value.items():
+                self._add_tree_child(parent, k, v)
+        elif isinstance(value, list):
+            for idx, v in enumerate(value):
+                self._add_tree_child(parent, f"[{idx}]", v)
+
+    def _add_tree_child(self, parent: QTreeWidgetItem, key: str, value: Any) -> None:
+        if isinstance(value, (dict, list)):
+            child = QTreeWidgetItem([str(key), ""])
+            parent.addChild(child)
+            self._add_tree_item_to_tree(child, value)
+        else:
+            child = QTreeWidgetItem([str(key), str(value)])
+            parent.addChild(child)

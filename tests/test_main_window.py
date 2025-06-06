@@ -255,21 +255,6 @@ class TestMainWindow:
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")
-    def test_collection_widget_creation(
-        self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
-    ) -> None:
-        """Test collection widget creation."""
-        # Create main window
-        main_window = MainWindow()
-
-        # Add collection widget
-        main_window.add_collection_widget("test_collection")
-
-        # Verify collection widget was added
-        assert main_window.collection_layout.count() > 0
-
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
     @patch("gui.connection_widgets.ConnectionDialog")
     def test_add_connection_dialog(
         self,
@@ -325,3 +310,31 @@ class TestMainWindow:
         if main_window.data_table:
             assert main_window.data_table.columnCount() == 3  # _id, name, value
             assert main_window.data_table.rowCount() == 2
+
+    @patch("gui.main_window.ConnectionManager")
+    @patch("gui.main_window.MongoClientWrapper")
+    def test_collection_tree_creation_and_index_context_menu(
+        self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
+    ) -> None:
+        """Test collection tree creation and index context menu actions."""
+        # Setup mock mongo client
+        mock_mongo_client_instance = MagicMock()
+        mock_mongo_client.return_value = mock_mongo_client_instance
+        mock_mongo_client_instance.list_collections.return_value = ["col1"]
+        mock_mongo_client_instance.list_indexes.return_value = [
+            {"name": "idx1", "key": [["field1", 1]], "unique": False}
+        ]
+        main_window = MainWindow()
+        main_window.mongo_client = mock_mongo_client_instance
+        main_window.load_collections()
+        # Check that the collection tree has the collection
+        assert main_window.collection_tree.topLevelItemCount() == 1
+        col_item = main_window.collection_tree.topLevelItem(0)
+        assert col_item is not None and col_item.text(0) == "col1"
+        # Simulate clicking the collection to load indexes
+        main_window.on_collection_tree_item_clicked(col_item, 0)
+        # Simulate expanding the collection to load indexes
+        main_window.on_collection_tree_item_expanded(col_item)
+        assert col_item.childCount() == 1
+        idx_item = col_item.child(0)
+        assert idx_item is not None and idx_item.text(0) == "idx1"

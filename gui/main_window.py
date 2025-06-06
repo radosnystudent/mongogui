@@ -60,7 +60,7 @@ class MainWindow(
         self.results: List[Dict[str, Any]] = []
         self.last_query = ""
         self.last_query_type = ""
-        self.last_collection = ""
+        self.last_collection: str = ""  # keep as str for mixin compatibility
         self.data_table: Optional[QTableWidget] = None
         self.json_tree: Optional[QTreeWidget] = None
 
@@ -109,15 +109,13 @@ class MainWindow(
         self.result_display.setVisible(False)
         left_layout.addWidget(self.result_display)
 
-        # Collection list
-        self.collection_scroll = QScrollArea()
-        self.collection_widget = QWidget()
-        self.collection_layout = QVBoxLayout(self.collection_widget)
-        self.collection_layout.setSpacing(0)  # Remove all spacing between buttons
-        self.collection_layout.setContentsMargins(0, 0, 0, 0)
-        self.collection_scroll.setWidget(self.collection_widget)
-        self.collection_scroll.setWidgetResizable(True)
-        left_layout.addWidget(self.collection_scroll)
+        # Collection tree (replaces old button list)
+        from PyQt5.QtWidgets import QTreeWidget
+
+        self.collection_tree = QTreeWidget()
+        self.collection_tree.setMinimumHeight(200)
+        left_layout.addWidget(self.collection_tree)
+        self.setup_collection_tree()  # Provided by CollectionPanelMixin
 
         main_layout.addWidget(left_panel)
 
@@ -142,6 +140,11 @@ class MainWindow(
         execute_btn = QPushButton("Execute")
         execute_btn.clicked.connect(self.execute_query)
         query_controls.addWidget(execute_btn)
+
+        explain_btn = QPushButton("Explain")
+        explain_btn.setToolTip("Show query plan and index usage for this query")
+        explain_btn.clicked.connect(self.execute_explain)
+        query_controls.addWidget(explain_btn)
 
         clear_btn = QPushButton("Clear")
         clear_btn.clicked.connect(self.clear_query)
