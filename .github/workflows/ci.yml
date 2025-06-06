@@ -61,13 +61,20 @@ jobs:
           brew install mongodb-community@6.0
           brew services start mongodb-community@6.0
 
-      # Start MongoDB for Windows using Chocolatey
+      # Start MongoDB for Windows using zip archive
       - name: Start MongoDB (Windows)
         if: runner.os == 'Windows'
         run: |
-          choco install -y mongodb --version=6.0.5
-          Start-Process -NoNewWindow -FilePath "C:\Program Files\MongoDB\Server\6.0\bin\mongod.exe" -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -PassThru
+          $mongoVersion = '6.0.5'
+          $mongoUrl = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-$mongoVersion.zip"
+          Invoke-WebRequest -Uri $mongoUrl -OutFile mongo.zip
+          Expand-Archive -Path mongo.zip -DestinationPath .
+          $env:PATH += ";$PWD\mongodb-windows-x86_64-$mongoVersion\bin"
+          New-Item -ItemType Directory -Force -Path C:\data\db
+          New-Item -ItemType Directory -Force -Path C:\data\log
+          Start-Process -NoNewWindow -FilePath "$PWD\mongodb-windows-x86_64-$mongoVersion\bin\mongod.exe" -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -PassThru
           Start-Sleep -Seconds 10
+        shell: pwsh
 
       - name: Test with pytest
         run: |
