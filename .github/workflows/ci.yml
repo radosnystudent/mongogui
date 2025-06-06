@@ -61,7 +61,7 @@ jobs:
           brew install mongodb-community@6.0
           brew services start mongodb-community@6.0
 
-      # Start MongoDB for Windows using zip archive (run mongod in foreground and wait for port)
+      # Start MongoDB for Windows using zip archive (fix Start-Process params)
       - name: Start MongoDB (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -78,7 +78,7 @@ jobs:
           $env:PATH += ";$mongoBin"
           New-Item -ItemType Directory -Force -Path C:\data\db | Out-Null
           New-Item -ItemType Directory -Force -Path C:\data\log | Out-Null
-          Start-Process -NoNewWindow -FilePath $mongod -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -WindowStyle Hidden
+          Start-Process -FilePath $mongod -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -WindowStyle Hidden
           $maxWait = 30
           $waited = 0
           while ($waited -lt $maxWait) {
