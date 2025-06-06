@@ -61,7 +61,7 @@ jobs:
           brew install mongodb-community@6.0
           brew services start mongodb-community@6.0
 
-      # Start MongoDB for Windows using zip archive (fix directory name for win32)
+      # Start MongoDB for Windows using zip archive (run mongod in foreground and wait for port)
       - name: Start MongoDB (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -70,8 +70,6 @@ jobs:
           Invoke-WebRequest -Uri $mongoUrl -OutFile mongo.zip
           $extractPath = "$PWD\mongodb"
           Expand-Archive -Path mongo.zip -DestinationPath $extractPath
-          Write-Host "Listing contents of $extractPath after extraction:"
-          Get-ChildItem -Recurse -Path $extractPath
           $mongoDir = Get-ChildItem -Directory -Path $extractPath -Recurse | Where-Object { $_.Name -like "mongodb-win32-x86_64-windows-*" } | Select-Object -First 1
           if (-not $mongoDir) { Write-Error 'MongoDB directory not found after extraction.'; exit 1 }
           $mongoBin = Join-Path $mongoDir.FullName 'bin'
@@ -80,8 +78,22 @@ jobs:
           $env:PATH += ";$mongoBin"
           New-Item -ItemType Directory -Force -Path C:\data\db | Out-Null
           New-Item -ItemType Directory -Force -Path C:\data\log | Out-Null
-          Start-Process -NoNewWindow -FilePath $mongod -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -PassThru
-          Start-Sleep -Seconds 10
+          Start-Process -NoNewWindow -FilePath $mongod -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -WindowStyle Hidden
+          $maxWait = 30
+          $waited = 0
+          while ($waited -lt $maxWait) {
+            try {
+              $tcp = New-Object System.Net.Sockets.TcpClient
+              $tcp.Connect('localhost', 27017)
+              $tcp.Close()
+              Write-Host 'MongoDB is up!'
+              break
+            } catch {
+              Start-Sleep -Seconds 1
+              $waited++
+            }
+          }
+          if ($waited -eq $maxWait) { Write-Error 'MongoDB did not start in time.'; exit 1 }
         shell: pwsh
 
       - name: Test with pytest
