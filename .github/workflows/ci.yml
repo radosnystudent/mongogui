@@ -61,6 +61,14 @@ jobs:
           brew install mongodb-community@6.0
           brew services start mongodb-community@6.0
 
+      # Start MongoDB for Windows using Chocolatey
+      - name: Start MongoDB (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          choco install -y mongodb --version=6.0.5
+          Start-Process -NoNewWindow -FilePath "C:\Program Files\MongoDB\Server\6.0\bin\mongod.exe" -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -PassThru
+          Start-Sleep -Seconds 10
+
       - name: Test with pytest
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
