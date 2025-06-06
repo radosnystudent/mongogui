@@ -45,6 +45,12 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-x11-0 libxcb-xinerama0
 
+      - name: Start MongoDB
+        if: runner.os != 'Windows'
+        uses: supercharge/mongodb-github-action@v1
+        with:
+          mongodb-version: "6.0"
+
       - name: Test with pytest
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
