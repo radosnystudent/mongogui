@@ -61,7 +61,7 @@ jobs:
           brew install mongodb-community@6.0
           brew services start mongodb-community@6.0
 
-      # Start MongoDB for Windows using zip archive (robust extraction path)
+      # Start MongoDB for Windows using zip archive (robust extraction path, debug output)
       - name: Start MongoDB (Windows)
         if: runner.os == 'Windows'
         run: |
@@ -70,7 +70,9 @@ jobs:
           Invoke-WebRequest -Uri $mongoUrl -OutFile mongo.zip
           $extractPath = "$PWD\mongodb"
           Expand-Archive -Path mongo.zip -DestinationPath $extractPath
-          $mongoDir = Get-ChildItem -Directory -Path $extractPath | Where-Object { $_.Name -like "mongodb-windows-x86_64-*" } | Select-Object -First 1
+          Write-Host "Listing contents of $extractPath after extraction:"
+          Get-ChildItem -Recurse -Path $extractPath
+          $mongoDir = Get-ChildItem -Directory -Path $extractPath -Recurse | Where-Object { $_.Name -like "mongodb-windows-x86_64-*" } | Select-Object -First 1
           if (-not $mongoDir) { Write-Error 'MongoDB directory not found after extraction.'; exit 1 }
           $mongoBin = Join-Path $mongoDir.FullName 'bin'
           $mongod = Join-Path $mongoBin 'mongod.exe'
