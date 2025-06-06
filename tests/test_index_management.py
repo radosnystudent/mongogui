@@ -45,7 +45,7 @@ def test_index_dialog_add_edit_remove(app: QApplication) -> None:
     # Simulate select and remove
     dlg.selected_index_name = "idx1"
     dlg.remove_index()
-    assert dlg.get_selected_index_name() == "idx1"
+    assert dlg.get_selected_index_name() is None
     # Simulate edit
     dlg.selected_index_name = "_id_"
     dlg.edit_index_dialog()

@@ -109,6 +109,7 @@ class IndexDialog(QDialog):
             )
             return
         self.done(4)  # Custom code for remove
+        self.selected_index_name = None  # Clear selection after removal
 
     def get_selected_index_name(self) -> Optional[str]:
         return self.selected_index_name
