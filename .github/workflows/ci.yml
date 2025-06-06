@@ -69,10 +69,13 @@ jobs:
           $mongoUrl = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-$mongoVersion.zip"
           Invoke-WebRequest -Uri $mongoUrl -OutFile mongo.zip
           Expand-Archive -Path mongo.zip -DestinationPath .
-          $env:PATH += ";$PWD\mongodb-windows-x86_64-$mongoVersion\bin"
+          $mongoDir = Get-ChildItem -Directory | Where-Object { $_.Name -like "mongodb-windows-x86_64-*" } | Select-Object -First 1
+          $mongoBin = Join-Path $mongoDir.FullName 'bin'
+          $env:PATH += ";$mongoBin"
           New-Item -ItemType Directory -Force -Path C:\data\db
           New-Item -ItemType Directory -Force -Path C:\data\log
-          Start-Process -NoNewWindow -FilePath "$PWD\mongodb-windows-x86_64-$mongoVersion\bin\mongod.exe" -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -PassThru
+          $mongod = Join-Path $mongoBin 'mongod.exe'
+          Start-Process -NoNewWindow -FilePath $mongod -ArgumentList "--dbpath=C:\data\db --logpath=C:\data\log\mongod.log --logappend --bind_ip=127.0.0.1" -PassThru
           Start-Sleep -Seconds 10
         shell: pwsh
 
