@@ -45,11 +45,21 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxkbcommon-x11-0 libxcb-xinerama0
 
-      - name: Start MongoDB
-        if: runner.os != 'Windows'
+      # Start MongoDB service for Linux (using container action)
+      - name: Start MongoDB (Linux)
+        if: runner.os == 'Linux'
         uses: supercharge/mongodb-github-action@v1
         with:
           mongodb-version: "6.0"
+
+      # Start MongoDB for macOS using Homebrew
+      - name: Start MongoDB (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew update
+          brew tap mongodb/brew
+          brew install mongodb-community@6.0
+          brew services start mongodb-community@6.0
 
       - name: Test with pytest
         run: |
