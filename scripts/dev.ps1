@@ -20,9 +20,8 @@ function Get-Help {
     Write-Host "  build          Build the package" -ForegroundColor Cyan
     Write-Host "  clean          Clean build artifacts" -ForegroundColor Cyan
     Write-Host "  all            Run all checks" -ForegroundColor Cyan
-    Write-Host "  all-checks     Run lint, mypy, format-check, sonar, and tests" -ForegroundColor Cyan
+    Write-Host "  all-checks     Run lint, mypy, format-check, and tests" -ForegroundColor Cyan
     Write-Host "  dev-setup      Set up development environment" -ForegroundColor Cyan
-    Write-Host "  sonar          Run SonarQube static analysis" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "Usage: .\dev.ps1 <command>" -ForegroundColor Yellow
 }
@@ -110,7 +109,6 @@ function Invoke-AllChecks {
     Invoke-Lint
     Test-Type
     Test-Format
-    Invoke-SonarCheck
     Test-Unit
 }
 
@@ -119,23 +117,6 @@ function Initialize-DevelopmentEnvironment {
     Install-DevelopmentDependencies
     Write-Host "Development environment setup complete!" -ForegroundColor Green
     Write-Host "Run '.\dev.ps1 help' to see available commands." -ForegroundColor Yellow
-}
-
-function Invoke-SonarCheck {
-    Write-Host "Running SonarQube static analysis..." -ForegroundColor Green
-    # Try sonar-scanner (Unix/WSL) or sonar-scanner.bat (Windows)
-    $scanner = $null
-    if (Get-Command sonar-scanner -ErrorAction SilentlyContinue) {
-        $scanner = "sonar-scanner"
-    } elseif (Get-Command sonar-scanner.bat -ErrorAction SilentlyContinue) {
-        $scanner = "sonar-scanner.bat"
-    }
-    if ($scanner) {
-        & $scanner
-    } else {
-        Write-Host "sonar-scanner not found. Please install SonarQube Scanner CLI and ensure 'sonar-scanner' or 'sonar-scanner.bat' is in your PATH. Also configure sonar-project.properties in the project root." -ForegroundColor Yellow
-        Write-Host "Download: https://docs.sonarsource.com/sonarqube/latest/analyzing-source-code/scanners/sonarscanner-cli/" -ForegroundColor Yellow
-    }
 }
 
 # Update python version check or shebang if present
@@ -157,9 +138,8 @@ switch ($Command.ToLower()) {
     "all" { Invoke-All }
     "all-checks" { Invoke-AllChecks }
     "dev-setup" { Initialize-DevelopmentEnvironment }
-    "sonar" { Invoke-SonarCheck }
-    default { 
+    default {
         Write-Host "Unknown command: $Command" -ForegroundColor Red
-        Get-Help 
+        Get-Help
     }
 }
