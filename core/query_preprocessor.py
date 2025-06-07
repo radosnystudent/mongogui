@@ -244,25 +244,57 @@ class QueryPreprocessor:
         return f"{fixed_key}:{fixed_value}"
 
     def _find_main_colon(self, text: str) -> int:
-        return self._search_colon_with_state_tracking(text)
-
-    def _search_colon_with_state_tracking(self, text: str) -> int:
         state = self._init_state()
         for i, char in enumerate(text):
-            if self._handle_colon_search_character(char, state):
-                if self._is_target_colon(char, state):
-                    return i
+            if self._update_colon_state(char, state):
+                continue
+            if (
+                char == ":"
+                and int(state["brace_level"]) == 0
+                and int(state["bracket_level"]) == 0
+                and not state["in_string"]
+            ):
+                return i
         return -1
+
+    def _update_colon_state(self, char: str, state: dict[str, int | bool]) -> bool:
+        """Update state for _find_main_colon and return True if should continue loop."""
+        if state["escape_next"]:
+            state["escape_next"] = False
+            return True
+        if char == "\\":
+            state["escape_next"] = True
+            return True
+        if char == '"' and not state["escape_next"]:
+            state["in_string"] = not bool(state["in_string"])
+            return True
+        if state["in_string"]:
+            return True
+        if char == "{":
+            state["brace_level"] = int(state["brace_level"]) + 1
+            return True
+        if char == "}":
+            state["brace_level"] = int(state["brace_level"]) - 1
+            return True
+        if char == "[":
+            state["bracket_level"] = int(state["bracket_level"]) + 1
+            return True
+        if char == "]":
+            state["bracket_level"] = int(state["bracket_level"]) - 1
+            return True
+        return False
 
     def _quote_if_needed(self, key: str) -> str:
         key = key.strip()
+        # Only quote if not already quoted
         if (key.startswith('"') and key.endswith('"')) or (
             key.startswith("'") and key.endswith("'")
         ):
             return key
-        if re.match(r"^[a-zA-Z_$]\w*$", key):
+        # Only quote valid JS/JSON identifiers
+        if re.match(r"^[a-zA-Z_$][\w$]*$", key):
             return f'"{key}"'
-        return f'"{key}"'
+        return key
 
 
 # Global instance for easy access
