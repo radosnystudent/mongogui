@@ -12,7 +12,7 @@ def random_collection_name() -> str:
 
 
 @pytest.fixture(scope="module")
-def mongo_client() -> typing.Generator[MongoClientWrapper, None, None]:
+def mongo_client() -> typing.Generator[MongoClientWrapper, None, None]:  # noqa: UP043
     wrapper = MongoClientWrapper()
     # Use test db, no auth, localhost
     wrapper.connect("localhost", 27017, "test", None, None, False)

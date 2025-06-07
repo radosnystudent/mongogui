@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
-from PyQt5.QtWidgets import QApplication, QDialog
+from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QTreeWidgetItem
 
 from gui.main_window import MainWindow
 
@@ -18,8 +18,9 @@ class TestMainWindow:
             self.app = QApplication([])
 
         # Create a fully mocked MainWindow
-        with patch("gui.main_window.ConnectionManager"), patch(
-            "gui.main_window.MongoClientWrapper"
+        with (
+            patch("gui.main_window.ConnectionManager"),
+            patch("gui.main_window.MongoClientWrapper"),
         ):
             self.main_window_class = MainWindow
 
@@ -90,9 +91,23 @@ class TestMainWindow:
             "collection2",
         ]
 
-        # Create main window and test connection
-        main_window = MainWindow()
-        main_window.connect_to_database("test_conn")
+        # Patch exec_ to auto-accept the dialog
+        from unittest.mock import patch
+
+        import gui.connection_manager_window as cmw
+
+        with (
+            patch.object(
+                cmw.ConnectionManagerWindow,
+                "exec_",
+                lambda self: (self.accept(), QDialog.Accepted)[1],
+            ),
+            patch.object(
+                QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.Ok
+            ),
+        ):
+            main_window = MainWindow()
+            main_window.connect_to_database("test_conn")
 
         # Verify connection was attempted
         mock_conn_manager_instance.get_connection_by_name.assert_called_with(
@@ -110,9 +125,23 @@ class TestMainWindow:
         mock_conn_manager.return_value = mock_conn_manager_instance
         mock_conn_manager_instance.get_connection_by_name.return_value = None
 
-        # Create main window and test connection failure
-        main_window = MainWindow()
-        main_window.connect_to_database("nonexistent_conn")
+        # Patch exec_ to auto-accept the dialog
+        from unittest.mock import patch
+
+        import gui.connection_manager_window as cmw
+
+        with (
+            patch.object(
+                cmw.ConnectionManagerWindow,
+                "exec_",
+                lambda self: (self.accept(), QDialog.Accepted)[1],
+            ),
+            patch.object(
+                QMessageBox, "critical", lambda *args, **kwargs: QMessageBox.Ok
+            ),
+        ):
+            main_window = MainWindow()
+            main_window.connect_to_database("nonexistent_conn")
 
         # Verify error handling
         mock_conn_manager_instance.get_connection_by_name.assert_called_with(
@@ -149,6 +178,13 @@ class TestMainWindow:
 
         # Create main window
         main_window = MainWindow()
+        # Patch for new logic: add mock client to active_clients and select a collection
+        main_window.active_clients = {"testdb": mock_mongo_client_instance}
+        db_item = QTreeWidgetItem(["testdb", ""])
+        col_item = QTreeWidgetItem(["", "test"])
+        db_item.addChild(col_item)
+        main_window.collection_tree.addTopLevelItem(db_item)
+        main_window.collection_tree.setCurrentItem(col_item)
         main_window.mongo_client = mock_mongo_client_instance
 
         # Clear query input
@@ -178,6 +214,13 @@ class TestMainWindow:
 
         # Create main window
         main_window = MainWindow()
+        # Patch for new logic: add mock client to active_clients and select a collection
+        main_window.active_clients = {"testdb": mock_mongo_client_instance}
+        db_item = QTreeWidgetItem(["testdb", ""])
+        col_item = QTreeWidgetItem(["", "test"])
+        db_item.addChild(col_item)
+        main_window.collection_tree.addTopLevelItem(db_item)
+        main_window.collection_tree.setCurrentItem(col_item)
         main_window.mongo_client = mock_mongo_client_instance
 
         # Set query text and execute
@@ -326,15 +369,29 @@ class TestMainWindow:
         ]
         main_window = MainWindow()
         main_window.mongo_client = mock_mongo_client_instance
+        # Ensure the mock client is associated with the db node for index loading
+        main_window.active_clients = {"testdb": mock_mongo_client_instance}
         main_window.load_collections()
-        # Check that the collection tree has the collection
+        # Check that the collection tree has the database node
         assert main_window.collection_tree.topLevelItemCount() == 1
-        col_item = main_window.collection_tree.topLevelItem(0)
+        db_item = main_window.collection_tree.topLevelItem(0)
+        assert db_item is not None and db_item.text(0) == "testdb"
+        # The collection should be a child of the db node
+        col_item = None
+        for i in range(db_item.childCount()):
+            child = db_item.child(i)
+            if child is not None and child.text(0) == "col1":
+                col_item = child
+                break
         assert col_item is not None and col_item.text(0) == "col1"
         # Simulate clicking the collection to load indexes
         main_window.on_collection_tree_item_clicked(col_item, 0)
         # Simulate expanding the collection to load indexes
         main_window.on_collection_tree_item_expanded(col_item)
-        assert col_item.childCount() == 1
-        idx_item = col_item.child(0)
-        assert idx_item is not None and idx_item.text(0) == "idx1"
+        idx_item = None
+        for i in range(col_item.childCount()):
+            child = col_item.child(i)
+            if child is not None and child.text(0) == "Index: idx1":
+                idx_item = child
+                break
+        assert idx_item is not None and idx_item.text(0) == "Index: idx1"

@@ -1,6 +1,6 @@
 import json
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import keyring
 from keyring.errors import PasswordDeleteError
@@ -18,8 +18,8 @@ class ConnectionManager:
         db: str,
         ip: str,
         port: int,
-        login: Optional[str],
-        password: Optional[str],
+        login: str | None,
+        password: str | None,
         tls: bool,
     ) -> None:
         # Store non-sensitive data in file
@@ -33,8 +33,8 @@ class ConnectionManager:
         if password:
             keyring.set_password(self.keyring_service, f"{name}_password", password)
 
-    def get_connections(self) -> List[Dict[str, Any]]:
-        connections: List[Dict[str, Any]] = []
+    def get_connections(self) -> list[dict[str, Any]]:
+        connections: list[dict[str, Any]] = []
         for fname in os.listdir(self.storage_path):
             if fname.endswith(".json"):
                 with open(os.path.join(self.storage_path, fname)) as f:
@@ -43,10 +43,10 @@ class ConnectionManager:
                     connections.append(data)
         return connections
 
-    def get_connection_by_name(self, name: str) -> Optional[Dict[str, Any]]:
+    def get_connection_by_name(self, name: str) -> dict[str, Any] | None:
         try:
             with open(os.path.join(self.storage_path, f"{name}.json")) as f:
-                data: Dict[str, Any] = json.load(f)
+                data: dict[str, Any] = json.load(f)
                 # Retrieve credentials from keyring
                 login = keyring.get_password(self.keyring_service, f"{name}_login")
                 password = keyring.get_password(
@@ -64,10 +64,10 @@ class ConnectionManager:
         db: str,
         ip: str,
         port: int,
-        login: Optional[str],
-        password: Optional[str],
+        login: str | None,
+        password: str | None,
         tls: bool,
-        new_name: Optional[str] = None,
+        new_name: str | None = None,
     ) -> None:
         """
         Update an existing connection. If new_name is provided and different from old_name, the connection is renamed.

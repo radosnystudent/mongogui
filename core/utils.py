@@ -1,11 +1,11 @@
 """Utility functions for MongoDB operations."""
 
-from typing import Any, Union
+from typing import Any
 
 from bson import ObjectId
 
 
-def convert_to_object_id(id_value: Any) -> Union[ObjectId, Any]:
+def convert_to_object_id(id_value: Any) -> ObjectId | Any:
     """
     Convert a string ID to ObjectId if possible, otherwise return the original value.
 

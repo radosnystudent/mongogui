@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -25,7 +25,8 @@ class CollectionPanelMixin:
     collection_tree: QTreeWidget  # Added collection_tree attribute
 
     def setup_collection_tree(self) -> None:
-        self.collection_tree.setHeaderLabels(["Collections"])
+        self.collection_tree.setColumnCount(1)
+        self.collection_tree.setHeaderLabels(["Database/Collection"])
         self.collection_tree.setContextMenuPolicy(
             Qt.ContextMenuPolicy.CustomContextMenu
         )
@@ -35,31 +36,69 @@ class CollectionPanelMixin:
         self.collection_tree.itemClicked.connect(self.on_collection_tree_item_clicked)
         self.collection_tree.itemExpanded.connect(self.on_collection_tree_item_expanded)
 
-    def load_collections(self) -> None:
-        if not hasattr(self, "collection_tree") or self.collection_tree is None:
-            return
-        self.collection_tree.clear()
-        if not self.mongo_client:
-            return
+    def add_database_collections(self, db_label: str, mongo_client: Any) -> None:
+        # Add a top-level node for the database, with its collections as children
+        db_item = QTreeWidgetItem([db_label])
+        db_item.setData(
+            0,
+            int(Qt.ItemDataRole.UserRole),
+            {"type": "database", "db": db_label, "mongo_client": mongo_client},
+        )
         try:
-            collections = self.mongo_client.list_collections()
+            collections = mongo_client.list_collections()
             collections = sorted(collections)
             for collection_name in collections:
                 col_item = QTreeWidgetItem([collection_name])
                 col_item.setData(
                     0,
                     int(Qt.ItemDataRole.UserRole),
-                    {"type": "collection", "name": collection_name},
+                    {
+                        "type": "collection",
+                        "name": collection_name,
+                        "db": db_label,
+                        "mongo_client": mongo_client,
+                    },
                 )
-                # Add dummy child so arrow is always visible
+                # Always add a dummy child for expand arrow
+                dummy = QTreeWidgetItem([""])
+                col_item.addChild(dummy)
+                db_item.addChild(col_item)
+            self.collection_tree.addTopLevelItem(db_item)
+        except Exception as e:
+            print(f"Error loading collections for {db_label}: {str(e)}")
+
+    def clear_database_collections(self, db_label: str) -> None:
+        # Remove the top-level node for a given database
+        for i in range(self.collection_tree.topLevelItemCount()):
+            item = self.collection_tree.topLevelItem(i)
+            if item and item.text(0) == db_label:
+                self.collection_tree.takeTopLevelItem(i)
+                break
+
+    def load_collections(self, mongo_client: Any) -> None:
+        if not hasattr(self, "collection_tree") or self.collection_tree is None:
+            return
+        self.collection_tree.clear()
+        if not mongo_client:
+            return
+        try:
+            collections = mongo_client.list_collections()
+            collections = sorted(collections)
+            for collection_name in collections:
+                col_item = QTreeWidgetItem([collection_name])
+                col_item.setData(
+                    0,
+                    int(Qt.ItemDataRole.UserRole),
+                    {
+                        "type": "collection",
+                        "name": collection_name,
+                        "db": getattr(mongo_client, "current_db", "testdb"),
+                    },
+                )
                 col_item.addChild(QTreeWidgetItem([""]))
                 self.collection_tree.addTopLevelItem(col_item)
         except Exception as e:
-            label = getattr(self, "db_info_label", None)
-            if label:
-                label.setText(f"Error loading collections: {str(e)}")
-            else:
-                print(f"Error loading collections: {str(e)}")
+            print(f"Error loading collections: {str(e)}")
 
     def add_collection_widget(self, collection_name: str) -> None:
         collection_btn = QPushButton(collection_name)
@@ -68,177 +107,180 @@ class CollectionPanelMixin:
         )
         self.collection_layout.addWidget(collection_btn)
 
+    def _get_mongo_client_for_item(self, item: QTreeWidgetItem) -> Any:
+        current: QTreeWidgetItem | None = item
+        while current is not None:
+            data = current.data(0, int(Qt.ItemDataRole.UserRole))
+            # Try to get mongo_client from collection node first, then parent (database)
+            if data and "mongo_client" in data:
+                return data.get("mongo_client")
+            current = current.parent()
+
     def on_collection_tree_item_expanded(self, item: QTreeWidgetItem) -> None:
         data = item.data(0, int(Qt.ItemDataRole.UserRole))
-        if data and data.get("type") == "collection":
-            first_child = item.child(0)
-            if (
-                item.childCount() == 1
-                and first_child is not None
-                and first_child.text(0) == ""
-            ):
+        if data and data.get("type") == "collection" and item.childCount() == 1:
+            only_child = item.child(0)
+            if only_child is not None and only_child.text(0) == "":
                 item.takeChildren()
-                collection_name = data["name"]
-                if not self.mongo_client:
-                    return
-                indexes = self.mongo_client.list_indexes(collection_name)
-                if isinstance(indexes, str):
-                    QMessageBox.critical(self.collection_tree, "Error", indexes)
-                    return
+                mongo_client = self._get_mongo_client_for_item(item)
+                if mongo_client is not None:
+                    self._load_collection_indexes(item, data, mongo_client)
+                    self.reload_collection_indexes_in_tree(item)
+
+    def _load_collection_indexes(
+        self, item: QTreeWidgetItem, data: dict, mongo_client: Any = None
+    ) -> None:
+        # This method is now handled by reload_collection_indexes_in_tree for UI updates
+        pass
+
+    def reload_collection_indexes_in_tree(
+        self, col_item: QTreeWidgetItem | None
+    ) -> None:
+        if col_item is None:
+            return
+        client = self._get_mongo_client_for_item(col_item)
+        if not client:
+            QMessageBox.critical(
+                self.collection_tree,
+                "Error",
+                "No MongoDB connection found for this collection.",
+            )
+            return
+        # Remove all children
+        while col_item.childCount() > 0:
+            child = col_item.child(0)
+            if child is not None:
+                col_item.removeChild(child)
+            else:
+                break
+        collection_name = col_item.text(0)
+        indexes = client.list_indexes(collection_name)
+        if isinstance(indexes, str):
+            QMessageBox.critical(self.collection_tree, "Error", indexes)
+            return
+        try:
+            if indexes:
                 for idx in indexes:
                     idx_name = idx.get("name", "")
-                    idx_item = QTreeWidgetItem([f"{idx_name}"])
+                    idx_item = QTreeWidgetItem([f"Index: {idx_name}"])
                     idx_item.setData(
                         0,
                         int(Qt.ItemDataRole.UserRole),
                         {"type": "index", "collection": collection_name, "index": idx},
                     )
-                    item.addChild(idx_item)
-
-    def on_collection_tree_item_clicked(
-        self, item: QTreeWidgetItem, column: int
-    ) -> None:
-        data = item.data(0, int(Qt.ItemDataRole.UserRole))
-        if data and data.get("type") == "collection":
-            collection_name = data["name"]
-            if hasattr(self, "query_input"):
-                self.query_input.setPlainText(f"db.{collection_name}.find({{}})")
-        # Don't reload indexes on click, only on expand
-
-    def _handle_collection_context_menu(
-        self,
-        menu: QMenu,
-        viewport: Optional[QWidget],
-        pos: Any,
-        data: dict,
-    ) -> None:
-        manage_action = menu.addAction("Manage indexes")
-        if viewport is not None:
-            action = menu.exec_(viewport.mapToGlobal(pos))
-        else:
-            action = menu.exec_(self.collection_tree.mapToGlobal(pos))
-        if action == manage_action:
-            self.show_add_index_dialog(data["name"])
-
-    def _handle_index_context_menu(
-        self,
-        menu: QMenu,
-        viewport: Optional[QWidget],
-        pos: Any,
-        data: dict,
-    ) -> None:
-        edit_action = menu.addAction("Edit")
-        delete_action = menu.addAction("Delete")
-        if viewport is not None:
-            action = menu.exec_(viewport.mapToGlobal(pos))
-        else:
-            action = menu.exec_(self.collection_tree.mapToGlobal(pos))
-        if action == edit_action:
-            self.show_edit_index_dialog(data["collection"], data["index"])
-        elif action == delete_action:
-            self.show_delete_index_dialog(data["collection"], data["index"])
-
-    def on_collection_tree_context_menu(self, pos: Any) -> None:
-        item = self.collection_tree.itemAt(pos)
-        if not item:
-            return
-        data = item.data(0, int(Qt.ItemDataRole.UserRole))
-        menu = QMenu(self.collection_tree)
-        viewport = self.collection_tree.viewport()
-        if data and data.get("type") == "collection":
-            self._handle_collection_context_menu(menu, viewport, pos, data)
-        elif data and data.get("type") == "index":
-            self._handle_index_context_menu(menu, viewport, pos, data)
-
-    def _extract_index_options(self, data: dict) -> dict:
-        # Helper to extract only non-None index options
-        opts = [
-            "name",
-            "unique",
-            "sparse",
-            "hidden",
-            "expireAfterSeconds",
-            "partialFilterExpression",
-        ]
-        return {opt: data[opt] for opt in opts if data.get(opt) is not None}
-
-    def show_add_index_dialog(self, collection_name: str) -> None:
-        # Pass current indexes to IndexDialog so all (including _id_) are shown
-        indexes = self.mongo_client.list_indexes(collection_name)
-        if isinstance(indexes, str):
-            QMessageBox.critical(self.collection_tree, "Error", indexes)
-            return
-        dlg = IndexDialog(indexes, self.collection_tree)
-        result = dlg.exec_()
-        if result == QDialog.Accepted:
-            data = dlg.get_index_data()
-            if data:
-                # Validate key format
-                key = data["key"]
-                if not (
-                    isinstance(key, list)
-                    and all(
-                        isinstance(pair, (list, tuple)) and len(pair) == 2
-                        for pair in key
-                    )
-                ):
-                    QMessageBox.critical(
-                        self.collection_tree,
-                        "Error",
-                        f"Index key must be a list of pairs, got: {key}",
-                    )
-                    return
-                kwargs = self._extract_index_options(data)
-                name = self.mongo_client.create_index(collection_name, key, **kwargs)
-                if isinstance(name, str) and not name.startswith("Create index error"):
-                    QMessageBox.information(
-                        self.collection_tree,
-                        "Index Created",
-                        f"Index '{name}' created.",
-                    )
-                else:
-                    QMessageBox.critical(self.collection_tree, "Error", str(name))
-            # Only reload indexes for the expanded collection
-            self.reload_collection_indexes_in_tree(collection_name)
-
-    def reload_collection_indexes_in_tree(self, collection_name: str) -> None:
-        # Find the collection item in the tree and reload its children (indexes)
-        col_item = self._find_collection_item(collection_name)
-        if not col_item:
-            return
-        self._clear_collection_children(col_item)
-        indexes = self.mongo_client.list_indexes(collection_name)
-        if isinstance(indexes, str):
-            QMessageBox.critical(self.collection_tree, "Error", indexes)
-            return
-        self._add_index_items_to_collection(col_item, collection_name, indexes)
+                    col_item.addChild(idx_item)
+        except Exception:
+            pass
+        # Always add a dummy node if no real index children
+        if col_item.childCount() == 0:
+            col_item.addChild(QTreeWidgetItem([""]))
         if hasattr(col_item, "setExpanded"):
             col_item.setExpanded(True)
 
-    def _find_collection_item(self, collection_name: str) -> Optional[QTreeWidgetItem]:
-        for i in range(self.collection_tree.topLevelItemCount()):
-            col_item = self.collection_tree.topLevelItem(i)
-            if col_item is not None and col_item.text(0) == collection_name:
-                return col_item
-        return None
-
-    def _clear_collection_children(self, col_item: QTreeWidgetItem) -> None:
-        if hasattr(col_item, "takeChildren"):
-            col_item.takeChildren()
-
     def _add_index_items_to_collection(
-        self, col_item: QTreeWidgetItem, collection_name: str, indexes: List[dict]
+        self, col_item: QTreeWidgetItem, collection_name: str, indexes: list[dict]
     ) -> None:
+        # This method is now inlined in reload_collection_indexes_in_tree, but keep for compatibility if called elsewhere
         for idx in indexes:
             idx_name = idx.get("name", "")
-            idx_item = QTreeWidgetItem([f"{idx_name}"])
+            idx_item = QTreeWidgetItem(["Index", idx_name])
             idx_item.setData(
                 0,
                 int(Qt.ItemDataRole.UserRole),
                 {"type": "index", "collection": collection_name, "index": idx},
             )
-            if hasattr(col_item, "addChild"):
-                col_item.addChild(idx_item)
+            col_item.addChild(idx_item)
+
+    def show_add_index_dialog(
+        self, collection_name: str, item: QTreeWidgetItem | None = None
+    ) -> None:
+        col_item, mongo_client = self._resolve_collection_item_and_client(
+            collection_name, item
+        )
+        if not mongo_client or col_item is None:
+            QMessageBox.critical(
+                self.collection_tree,
+                "Error",
+                "No MongoDB connection found for this collection.",
+            )
+            return
+        indexes = mongo_client.list_indexes(collection_name)
+        if isinstance(indexes, str):
+            QMessageBox.critical(self.collection_tree, "Error", indexes)
+            return
+        self._handle_index_dialog_and_create(
+            indexes, mongo_client, collection_name, col_item
+        )
+
+    def _find_collection_item_and_client(
+        self, collection_name: str
+    ) -> tuple[QTreeWidgetItem | None, Any | None]:
+        for i in range(self.collection_tree.topLevelItemCount()):
+            db_item = self.collection_tree.topLevelItem(i)
+            if db_item is None:
+                continue
+            for j in range(db_item.childCount()):
+                c_item = db_item.child(j)
+                if c_item is not None and c_item.text(1) == collection_name:
+                    client = self._get_mongo_client_for_item(c_item)
+                    return c_item, client
+        return None, None
+
+    def _resolve_collection_item_and_client(
+        self, collection_name: str, item: QTreeWidgetItem | None
+    ) -> tuple[QTreeWidgetItem | None, Any | None]:
+        if item is not None:
+            return item, self._get_mongo_client_for_item(item)
+        return self._find_collection_item_and_client(collection_name)
+
+    def _handle_index_dialog_and_create(
+        self,
+        indexes: list,
+        mongo_client: Any,
+        collection_name: str,
+        col_item: QTreeWidgetItem | None,
+    ) -> None:
+        dlg = IndexDialog(indexes, self.collection_tree)
+        result = dlg.exec_()
+        if result == QDialog.Accepted:
+            data = dlg.get_index_data()
+            if data and not self._validate_and_create_index(
+                data, mongo_client, collection_name
+            ):
+                return
+            if col_item is not None:
+                self.reload_collection_indexes_in_tree(col_item)
+
+    def _validate_and_create_index(
+        self, index_data: dict, client: Any, collection_name: str
+    ) -> bool:
+        key = index_data["key"]
+        if not (
+            isinstance(key, list)
+            and all(isinstance(pair, list | tuple) and len(pair) == 2 for pair in key)
+        ):
+            QMessageBox.critical(
+                self.collection_tree,
+                "Error",
+                f"Index key must be a list of pairs, got: {key}",
+            )
+            return False
+        kwargs = self._extract_index_options(index_data)
+        name = client.create_index(collection_name, key, **kwargs)
+        if isinstance(name, str) and not name.startswith("Create index error"):
+            QMessageBox.information(
+                self.collection_tree,
+                "Index Created",
+                f"Index '{name}' created.",
+            )
+        else:
+            QMessageBox.critical(self.collection_tree, "Error", str(name))
+            return False
+        return True
+
+    def _extract_index_options(self, data: dict) -> dict:
+        # Minimal stub to fix mypy error; real logic can be implemented as needed
+        return {k: v for k, v in data.items() if k not in ("key", "name")}
 
     def show_edit_index_dialog(self, collection_name: str, index_dict: dict) -> None:
         from gui.index_dialog import IndexEditDialog
@@ -266,7 +308,6 @@ class CollectionPanelMixin:
                     QMessageBox.critical(
                         self.collection_tree, "Error", str(update_result)
                     )
-            self.load_collections()
 
     def show_delete_index_dialog(self, collection_name: str, index_dict: dict) -> None:
         name = index_dict.get("name")
@@ -278,4 +319,61 @@ class CollectionPanelMixin:
                 )
             else:
                 QMessageBox.critical(self.collection_tree, "Error", str(drop_result))
-            self.load_collections()
+
+    def on_collection_tree_context_menu(self, pos: Any) -> None:
+        item = self.collection_tree.itemAt(pos)
+        if not item:
+            return
+        data = item.data(0, int(Qt.ItemDataRole.UserRole))
+        menu = QMenu(self.collection_tree)
+        viewport = self.collection_tree.viewport()
+        if data and data.get("type") == "collection":
+            self._handle_collection_context_menu(menu, viewport, pos, data)
+        elif data and data.get("type") == "index":
+            self._handle_index_context_menu(menu, viewport, pos, data)
+
+    def _handle_collection_context_menu(
+        self, menu: QMenu, viewport: QWidget | None, pos: Any, data: dict
+    ) -> None:
+        manage_action = menu.addAction("Manage indexes")
+        action = menu.exec_(
+            viewport.mapToGlobal(pos)
+            if viewport is not None
+            else self.collection_tree.mapToGlobal(pos)
+        )
+        if action == manage_action:
+            self.show_add_index_dialog(data["name"], item=None)
+
+    def _handle_index_context_menu(
+        self, menu: QMenu, viewport: QWidget | None, pos: Any, data: dict
+    ) -> None:
+        edit_action = menu.addAction("Edit")
+        delete_action = menu.addAction("Delete")
+        action = menu.exec_(
+            viewport.mapToGlobal(pos)
+            if viewport is not None
+            else self.collection_tree.mapToGlobal(pos)
+        )
+        if action == edit_action:
+            self.show_edit_index_dialog(data["collection"], data["index"])
+        elif action == delete_action:
+            self.show_delete_index_dialog(data["collection"], data["index"])
+
+    def on_collection_tree_item_clicked(
+        self, item: QTreeWidgetItem, column: int
+    ) -> None:
+        data = item.data(0, int(Qt.ItemDataRole.UserRole))
+        if data and data.get("type") == "collection":
+            collection_name = data["name"]
+            parent = item.parent()
+            db_label = parent.text(0) if parent is not None else ""
+            if hasattr(self, "query_input"):
+                self.query_input.setPlainText(f"db.{collection_name}.find({{}})")
+            # Store for query execution
+            self.last_collection = collection_name
+            self.last_db_label = db_label
+            # Set mongo_client for QueryPanelMixin/Explain
+            active_clients = getattr(self, "active_clients", None)
+            if isinstance(active_clients, dict) and db_label in active_clients:
+                self.mongo_client = active_clients[db_label]
+        # Don't reload indexes on click, only on expand

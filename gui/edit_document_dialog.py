@@ -1,5 +1,4 @@
 import json
-from typing import Optional
 
 from PyQt5.QtWidgets import (
     QDialog,
@@ -13,7 +12,7 @@ from PyQt5.QtWidgets import (
 
 
 class EditDocumentDialog(QDialog):
-    def __init__(self, document: dict, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, document: dict, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Edit Document")
         self.setMinimumSize(600, 400)
@@ -34,7 +33,7 @@ class EditDocumentDialog(QDialog):
         self.save_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
 
-    def get_edited_document(self) -> Optional[dict]:
+    def get_edited_document(self) -> dict | None:
         try:
             self._edited_doc = json.loads(self.text_edit.toPlainText())
         except Exception as e:

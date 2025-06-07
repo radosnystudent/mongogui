@@ -1,4 +1,5 @@
-from typing import Any, Callable, Dict, List, Set
+from collections.abc import Callable
+from typing import Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -25,7 +26,7 @@ class QueryPanelMixin:
     next_btn: Any
     page_label: Any
     result_count_label: Any
-    results: List[Dict[str, Any]]
+    results: list[dict[str, Any]]
     current_page: int
     page_size: int
     last_query: str
@@ -33,6 +34,7 @@ class QueryPanelMixin:
     json_tree: Any
     _table_signals_connected: bool = False
     _tree_signals_connected: bool = False
+    _explain_summary_widget: QWidget | None = None
 
     def execute_query(self) -> None:
         if not self.mongo_client:
@@ -135,10 +137,10 @@ class QueryPanelMixin:
             "_tree_signals_connected",
         )
 
-    def display_table_results(self, results: List[Dict[str, Any]]) -> None:
+    def display_table_results(self, results: list[dict[str, Any]]) -> None:
         if not results or not self.data_table:
             return
-        all_keys: Set[str] = set()
+        all_keys: set[str] = set()
         for doc in results:
             all_keys.update(doc.keys())
         columns = sorted(all_keys)
@@ -182,7 +184,7 @@ class QueryPanelMixin:
             if action == edit_action:
                 self.edit_document(doc)
 
-    def display_tree_results(self, results: List[Dict[str, Any]]) -> None:
+    def display_tree_results(self, results: list[dict[str, Any]]) -> None:
         if not self.json_tree:
             return
         if not results:
@@ -263,7 +265,7 @@ class QueryPanelMixin:
                 None, EDIT_DOCUMENT_TITLE, f"Error updating document: {e}"
             )
 
-    def add_tree_item(self, parent: QTreeWidgetItem, data: Dict[str, Any]) -> None:
+    def add_tree_item(self, parent: QTreeWidgetItem, data: dict[str, Any]) -> None:
         for key, value in data.items():
             if isinstance(value, dict):
                 child = QTreeWidgetItem(parent, [key, ""])
@@ -307,18 +309,219 @@ class QueryPanelMixin:
             self._set_db_info_label(f"Explain error: {str(e)}")
 
     def display_explain_result(self, result: Any) -> None:
-        """Display the explain plan as a tree in the Results section and hide the result_display box."""
+        """Display the explain plan as a tree in the Results section and show a summary box above it."""
         if not self.json_tree:
             return
+
+        self._setup_explain_tree_view()
+        self._hide_other_result_displays()
+        self._remove_previous_summary_widget()
+        self._create_summary_widget(result)
+        self._display_explain_tree(result)
+
+    def _setup_explain_tree_view(self) -> None:
+        """Set up the tree view for explain results."""
+        from PyQt5.QtWidgets import QHeaderView
+
         self.json_tree.clear()
         self.json_tree.show()
-        self.result_display.hide()  # Always hide the array/text box for explain
+        self.json_tree.header().setSectionResizeMode(0, QHeaderView.Interactive)
+        self.json_tree.header().setSectionResizeMode(1, QHeaderView.Interactive)
+        self.json_tree.setColumnWidth(0, 350)
+        self.json_tree.setColumnWidth(1, 600)
+
+    def _hide_other_result_displays(self) -> None:
+        """Hide data table and result display widgets."""
+        if hasattr(self, "data_table") and self.data_table is not None:
+            self.data_table.hide()
+        if hasattr(self, "result_display") and self.result_display is not None:
+            self.result_display.hide()
+
+    def _remove_previous_summary_widget(self) -> None:
+        """Remove any existing summary widget."""
+        if hasattr(self, "_explain_summary_widget") and self._explain_summary_widget:
+            parent_layout = (
+                self.json_tree.parentWidget().layout()
+                if self.json_tree.parentWidget()
+                else None
+            )
+            if parent_layout:
+                parent_layout.removeWidget(self._explain_summary_widget)
+            self._explain_summary_widget.deleteLater()
+            self._explain_summary_widget = None
+
+    def _create_summary_widget(self, result: Any) -> None:
+        """Create and display the query summary widget."""
+        from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
+
+        summary_text = self._build_explain_summary(result)
+        if not summary_text:
+            return
+
+        summary_widget = QWidget(self.json_tree.parentWidget())
+        summary_layout = QVBoxLayout(summary_widget)
+        summary_label = QLabel(f"<b>Query Summary</b><br>{summary_text}")
+        summary_label.setWordWrap(True)
+        summary_layout.addWidget(summary_label)
+        summary_layout.setContentsMargins(8, 8, 8, 8)
+        summary_widget.setLayout(summary_layout)
+
+        parent_layout = (
+            self.json_tree.parentWidget().layout()
+            if self.json_tree.parentWidget()
+            else None
+        )
+        if parent_layout:
+            parent_layout.insertWidget(0, summary_widget)
+        self._explain_summary_widget = summary_widget
+
+    def _display_explain_tree(self, result: Any) -> None:
+        """Display the explain result in the tree view."""
         if isinstance(result, dict):
-            root_item = QTreeWidgetItem(self.json_tree, ["Explain Plan", ""])
+            root_item = QTreeWidgetItem(self.json_tree, ["Explain Plan"])
             self._add_tree_item_to_tree(root_item, result)
             root_item.setExpanded(True)
         else:
-            QTreeWidgetItem(self.json_tree, ["Result", str(result)])
+            QTreeWidgetItem(self.json_tree, ["Result: " + str(result)])
+
+    def _build_explain_summary(self, result: Any) -> str:
+        """Extract and format key insights from explain() output for summary display."""
+        if not isinstance(result, dict):
+            return ""
+
+        plan = result.get("queryPlanner", {}).get("winningPlan", {})
+        exec_stats = result.get("executionStats", {})
+
+        summary_lines = [
+            self._get_used_index_info(plan),
+            self._get_scan_type_info(plan),
+            self._get_docs_scanned_info(exec_stats),
+            self._get_execution_time_info(exec_stats),
+            self._get_sort_info(plan),
+            self._get_rejected_plans_info(result),
+        ]
+        return "<br>".join(summary_lines)
+
+    def _find_stage_in_plan(self, plan: Any, stage_name: str) -> dict[str, Any] | None:
+        """Helper to recursively search for a stage in the plan."""
+        if not isinstance(plan, dict):
+            return None
+        if plan.get("stage") == stage_name:
+            return plan
+
+        return self._search_nested_plan_structures(plan, stage_name)
+
+    def _search_nested_plan_structures(
+        self, plan: dict[str, Any], stage_name: str
+    ) -> dict[str, Any] | None:
+        """Search through nested plan structures for a specific stage."""
+        search_keys = (
+            "inputStage",
+            "inputStages",
+            "shards",
+            "queryPlan",
+            "winningPlan",
+            "children",
+            "subplans",
+        )
+
+        for key in search_keys:
+            val = plan.get(key)
+            result = self._search_plan_value(val, stage_name)
+            if result:
+                return result
+        return None
+
+    def _search_plan_value(self, val: Any, stage_name: str) -> dict[str, Any] | None:
+        """Search a plan value (dict or list) for a specific stage."""
+        if isinstance(val, dict):
+            return self._find_stage_in_plan(val, stage_name)
+        elif isinstance(val, list):
+            for v in val:
+                found = self._find_stage_in_plan(v, stage_name)
+                if found:
+                    return found
+        return None
+
+    def _find_deepest_access_stage(self, plan: Any) -> str | None:
+        """Find the deepest access stage in the plan."""
+        access_stages = {"IXSCAN", "COLLSCAN", "FETCH"}
+        result_stage = None
+
+        def recurse(node: Any) -> None:
+            nonlocal result_stage
+            if not isinstance(node, dict):
+                return
+            if node.get("stage") in access_stages:
+                result_stage = node.get("stage")
+
+            search_keys = ("inputStage", "inputStages", "children", "subplans")
+            for key in search_keys:
+                val = node.get(key)
+                if isinstance(val, dict):
+                    recurse(val)
+                elif isinstance(val, list):
+                    for v in val:
+                        recurse(v)
+
+        recurse(plan)
+        return result_stage
+
+    def _get_used_index_info(self, plan: dict[str, Any]) -> str:
+        """Get information about index usage."""
+        ixscan = self._find_stage_in_plan(plan, "IXSCAN")
+        if ixscan and "indexName" in ixscan:
+            return f"Used index: {ixscan['indexName']}"
+        elif plan.get("inputStage", {}).get("stage") == "COLLSCAN":
+            return "No index used (COLLSCAN)"
+        return "No index used (COLLSCAN)"
+
+    def _get_scan_type_info(self, plan: dict[str, Any]) -> str:
+        """Get information about scan type."""
+        scan_type = self._find_deepest_access_stage(plan)
+        return f"Scan type: {scan_type}" if scan_type else "Scan type: Unknown"
+
+    def _get_docs_scanned_info(self, exec_stats: dict[str, Any]) -> str:
+        """Get information about documents scanned vs returned."""
+        docs_examined = exec_stats.get("totalDocsExamined")
+        n_returned = exec_stats.get("nReturned")
+        if docs_examined is not None and n_returned is not None:
+            return f"Documents scanned / returned: {docs_examined} / {n_returned}"
+        return "Documents scanned / returned: Unknown"
+
+    def _get_execution_time_info(self, exec_stats: dict[str, Any]) -> str:
+        """Get information about execution time."""
+        exec_time = exec_stats.get("executionTimeMillis")
+        return (
+            f"Execution time: {exec_time} ms"
+            if exec_time is not None
+            else "Execution time: Unknown"
+        )
+
+    def _get_sort_info(self, plan: dict[str, Any]) -> str:
+        """Get information about sorting."""
+        has_sort = bool(self._find_stage_in_plan(plan, "SORT"))
+        return f"In-memory sort: {'Yes' if has_sort else 'No'}"
+
+    def _get_rejected_plans_info(self, result: dict[str, Any]) -> str:
+        """Get information about rejected plans."""
+        rejected = result.get("queryPlanner", {}).get("rejectedPlans", [])
+        rejected_count = len(rejected)
+        if not rejected_count:
+            return "Rejected plans: 0"
+
+        rejected_indexes = []
+        for r in rejected:
+            ix = self._find_stage_in_plan(r, "IXSCAN")
+            if ix and "indexName" in ix:
+                rejected_indexes.append(ix["indexName"])
+
+        if rejected_indexes:
+            return (
+                f"Rejected plans: {rejected_count} (e.g. {', '.join(rejected_indexes)})"
+            )
+        else:
+            return f"Rejected plans: {rejected_count}"
 
     def _add_tree_item_to_tree(self, parent: QTreeWidgetItem, value: Any) -> None:
         # Refactored to reduce cognitive complexity
@@ -330,7 +533,7 @@ class QueryPanelMixin:
                 self._add_tree_child(parent, f"[{idx}]", v)
 
     def _add_tree_child(self, parent: QTreeWidgetItem, key: str, value: Any) -> None:
-        if isinstance(value, (dict, list)):
+        if isinstance(value, dict | list):
             child = QTreeWidgetItem([str(key), ""])
             parent.addChild(child)
             self._add_tree_item_to_tree(child, value)

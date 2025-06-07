@@ -1,6 +1,4 @@
-﻿from typing import Optional, Tuple
-
-from PyQt5.QtCore import Qt
+﻿from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
@@ -14,7 +12,7 @@ from PyQt5.QtWidgets import (
 
 
 class ConnectionDialog(QDialog):
-    def __init__(self, parent: Optional[QWidget] = None) -> None:
+    def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("New Connection")
         self.setMinimumWidth(400)
@@ -32,9 +30,7 @@ class ConnectionDialog(QDialog):
         self.tls_checkbox = QCheckBox("Use TLS/SSL")
         self.ok_btn = QPushButton("OK")
         self.cancel_btn = QPushButton("Cancel")
-        self.connection_result: Optional[Tuple[str, str, str, str, str, str, bool]] = (
-            None
-        )
+        self.connection_result: tuple[str, str, str, str, str, str, bool] | None = None
 
         layout = QVBoxLayout()
         layout.addWidget(QLabel("Connection Name:"))
@@ -82,5 +78,5 @@ class ConnectionDialog(QDialog):
             self.connection_result = (name, db, ip, port, login, password, tls)
             super().accept()
 
-    def get_result(self) -> Optional[Tuple[str, str, str, str, str, str, bool]]:
+    def get_result(self) -> tuple[str, str, str, str, str, str, bool] | None:
         return self.connection_result

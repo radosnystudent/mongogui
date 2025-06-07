@@ -1,11 +1,21 @@
-from typing import TYPE_CHECKING, Any, Dict
+from typing import TYPE_CHECKING, Any
 
 from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import QDialog, QLabel, QMenu, QPushButton, QVBoxLayout, QWidget
+from PyQt5.QtWidgets import (
+    QDialog,
+    QLabel,
+    QMenu,
+    QMessageBox,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from core.mongo_client import MongoClientWrapper
 from gui.collection_panel import CollectionPanelMixin
 from gui.connection_dialog import ConnectionDialog
+
+CONNECTION_ERROR_TITLE = "Connection Error"
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QTextEdit
@@ -27,26 +37,26 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
     page_label: Any
     result_count_label: Any
     db_info_label: Any  # Ensure this is always present
+    active_clients: dict[str, MongoClientWrapper]
 
-    def _set_db_info_label(self, text: str) -> None:
-        """Set text in both db_info_label and result_display for compatibility."""
-        if hasattr(self, "db_info_label") and self.db_info_label:
-            self.db_info_label.setText(text)
-        if hasattr(self, "result_display") and self.result_display:
-            self.result_display.setPlainText(text)
+    def __init__(self) -> None:
+        super().__init__()
+        self.active_clients = {}  # connection_name -> MongoClientWrapper
 
     def load_connections(self) -> None:
-        while self.connection_layout.count():
+        count = self.connection_layout.count()
+        while count:
             child = self.connection_layout.takeAt(0)
             if child and child.widget():
                 widget = child.widget()
                 if widget:
                     widget.deleteLater()
+            count -= 1
         connections = self.conn_manager.get_connections()
         for conn in connections:
             self.add_connection_widget(conn)
 
-    def add_connection_widget(self, conn: Dict[str, Any]) -> None:
+    def add_connection_widget(self, conn: dict[str, Any]) -> None:
         conn_widget = QWidget()
         conn_layout = QVBoxLayout(conn_widget)
         conn_layout.setContentsMargins(0, 0, 0, 0)
@@ -85,10 +95,19 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
         elif action == remove_action:
             self.remove_connection(name)
 
+    def add_connection(self) -> None:
+        dialog = ConnectionDialog(None)
+        if dialog.exec_() == QDialog.Accepted:
+            conn_data = dialog.get_connection_data()
+            try:
+                self.conn_manager.add_connection(conn_data)
+                self.load_connections()
+            except Exception:
+                pass
+
     def edit_connection(self, name: str) -> None:
         conn_data = self.conn_manager.get_connection_by_name(name)
         if not conn_data:
-            self._set_db_info_label(f"Connection '{name}' not found")
             return
         dialog = ConnectionDialog(None)
         dialog.name_input.setText(conn_data["name"])
@@ -110,26 +129,13 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
                     updated_data.get("password"),
                     updated_data.get("tls", False),
                 )
-                self._set_db_info_label(f"Updated connection: {updated_data['name']}")
                 self.load_connections()
-            except Exception as e:
-                self._set_db_info_label(f"Error updating connection: {e}")
-
-    def add_connection(self) -> None:
-        dialog = ConnectionDialog(None)
-        if dialog.exec_() == QDialog.Accepted:
-            conn_data = dialog.get_connection_data()
-            try:
-                self.conn_manager.add_connection(conn_data)
-                self._set_db_info_label(f"Added connection: {conn_data['name']}")
-                self.load_connections()
-            except Exception as e:
-                self._set_db_info_label(f"Error adding connection: {e}")
+            except Exception:
+                pass
 
     def duplicate_connection(self, name: str) -> None:
         conn_data = self.conn_manager.get_connection_by_name(name)
         if not conn_data:
-            self._set_db_info_label(f"Connection '{name}' not found")
             return
         try:
             new_name = f"{name}_copy"
@@ -140,10 +146,9 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
             conn_data_copy = conn_data.copy()
             conn_data_copy["name"] = new_name
             self.conn_manager.add_connection(conn_data_copy)
-            self._set_db_info_label(f"Duplicated connection as '{new_name}'")
             self.load_connections()
-        except Exception as e:
-            self._set_db_info_label(f"Failed to duplicate: {e}")
+        except Exception:
+            pass
 
     def edit_and_connect(self) -> None:
         dialog = ConnectionDialog(None)
@@ -151,11 +156,10 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
             conn_data = dialog.get_connection_data()
             try:
                 self.conn_manager.add_connection(conn_data)
-                self._set_db_info_label(f"Added connection: {conn_data['name']}")
                 self.load_connections()
                 self.connect_to_database(conn_data["name"])
             except ValueError:
-                self._set_db_info_label("Error: Invalid port number")
+                pass
 
     def remove_connection(self, name: str) -> None:
         self.conn_manager.remove_connection(name)
@@ -163,12 +167,17 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
 
     def connect_to_database(self, connection_name: str) -> None:
         conn_data = self.conn_manager.get_connection_by_name(connection_name)
+        parent_widget = getattr(self, "collection_tree", None)
         if not conn_data:
-            self._set_db_info_label(f"Connection '{connection_name}' not found")
+            QMessageBox.critical(
+                parent_widget,
+                CONNECTION_ERROR_TITLE,
+                f"Connection '{connection_name}' not found",
+            )
             return
         try:
-            self.mongo_client = MongoClientWrapper()
-            success = self.mongo_client.connect(
+            mongo_client = MongoClientWrapper()
+            success = mongo_client.connect(
                 conn_data["ip"],
                 conn_data["port"],
                 conn_data["db"],
@@ -177,12 +186,20 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
                 conn_data.get("tls", False),
             )
             if success:
-                self.current_connection = conn_data
-                self._set_db_info_label(
-                    f"Connected: {connection_name} ({conn_data['db']}@{conn_data['ip']}:{conn_data['port']})"
-                )
-                self.load_collections()
+                self.active_clients[connection_name] = mongo_client
+                # Add this database to the collections tree
+                self.add_database_collections(connection_name, mongo_client)
             else:
-                self._set_db_info_label(f"Failed to connect to {connection_name}")
+                QMessageBox.critical(
+                    parent_widget,
+                    CONNECTION_ERROR_TITLE,
+                    f"Failed to connect to {connection_name}",
+                )
         except Exception as e:
-            self._set_db_info_label(f"Connection error: {str(e)}")
+            QMessageBox.critical(parent_widget, CONNECTION_ERROR_TITLE, str(e))
+
+    def disconnect_database(self, connection_name: str) -> None:
+        # Remove client and its collections from the tree
+        if connection_name in self.active_clients:
+            del self.active_clients[connection_name]
+            self.clear_database_collections(connection_name)

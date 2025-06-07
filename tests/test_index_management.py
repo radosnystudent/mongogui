@@ -1,6 +1,7 @@
 # mypy: ignore-errors
 import sys
-from typing import Generator, cast
+from collections.abc import Generator
+from typing import cast
 
 import pytest
 from PyQt5.QtWidgets import QApplication
@@ -9,7 +10,7 @@ from gui.index_dialog import IndexDialog, IndexEditDialog
 
 
 @pytest.fixture(scope="module")
-def app() -> Generator[object, None, None]:
+def app() -> Generator[object]:
     app = QApplication.instance() or QApplication(sys.argv)
     yield app
 

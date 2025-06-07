@@ -11,7 +11,6 @@ import platform
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Tuple
 
 
 def detect_platform() -> str:
@@ -25,7 +24,7 @@ def detect_platform() -> str:
         return "unknown"
 
 
-def run_command(command: List[str], shell: bool = False) -> bool:
+def run_command(command: list[str], shell: bool = False) -> bool:
     """Run a command and return success status."""
     if shell:
         # nosec B602: subprocess call with shell=True identified, security issue.
@@ -96,7 +95,7 @@ def try_run_platform_script(platform_type: str, script_dir: Path) -> bool:
     return False
 
 
-def get_venv_executables(platform_type: str, venv_path: Path) -> Tuple[Path, Path]:
+def get_venv_executables(platform_type: str, venv_path: Path) -> tuple[Path, Path]:
     """Return the python and pip executables for the venv."""
     if platform_type == "windows":
         python_exe = venv_path / "Scripts" / "python.exe"

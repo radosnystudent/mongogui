@@ -31,7 +31,7 @@ mongogui = "main:main"
 # Black configuration
 [tool.black]
 line-length = 88
-target-version = ['py38']
+target-version = ['py313']
 include = '\.pyi?$'
 extend-exclude = '''
 /(
@@ -49,7 +49,7 @@ extend-exclude = '''
 
 # Ruff configuration
 [tool.ruff]
-target-version = "py38"
+target-version = "py313"
 line-length = 88
 
 [tool.ruff.lint]
@@ -76,7 +76,7 @@ known-first-party = ["core", "gui"]
 
 # Mypy configuration
 [tool.mypy]
-python_version = "3.8"
+python_version = "3.13"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = true
