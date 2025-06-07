@@ -147,17 +147,27 @@ class QueryPreprocessor:
         }
 
     def _smart_split(self, text: str, delimiter: str) -> list[str]:
+        """
+        Split a string by a delimiter, but only at the top level (not inside nested braces, brackets, or strings).
+        This is used to correctly split key-value pairs or array elements in MongoDB-like query syntax.
+        """
         return self._split_with_state_tracking(text, delimiter)
 
     def _split_with_state_tracking(self, text: str, delimiter: str) -> list[str]:
+        """
+        Split the input text by the given delimiter, but only when not inside a string, object, or array.
+        Uses a state machine to track nesting and string context.
+        """
         parts: list[str] = []
         current_part: str = ""
         state: dict[str, int | bool] = self._init_state()
         for char in text:
             current_part += char
+            # Only split if not inside a string, object, or array
             if self._process_character(char, delimiter, state, parts, current_part):
                 current_part = ""
         if current_part:
+            # Remove trailing delimiter if present
             parts.append(
                 current_part[:-1] if current_part.endswith(delimiter) else current_part
             )
@@ -171,24 +181,37 @@ class QueryPreprocessor:
         parts: list[str],
         current_part: str,
     ) -> bool:
+        """
+        Update the state machine for the current character and determine if a split should occur.
+        Returns True if a split was made (i.e., delimiter found at top level), otherwise False.
+        """
+        # Handle escape sequences inside strings
         if state["escape_next"]:
             state["escape_next"] = False
             return False
         if char == "\\":
             state["escape_next"] = True
             return False
+        # Toggle in_string state on unescaped double quotes
         if char == '"' and not state["escape_next"]:
             state["in_string"] = not bool(state["in_string"])
             return False
+        # If inside a string, do not split or update nesting
         if state["in_string"]:
             return False
+        # Update nesting levels for braces and brackets
         self._update_nesting_levels(char, state)
+        # Only split if at top level (not nested)
         if self._should_split_here(char, delimiter, state):
             parts.append(current_part[:-1])
             return True
         return False
 
     def _update_nesting_levels(self, char: str, state: dict[str, int | bool]) -> None:
+        """
+        Update the nesting level counters for braces and brackets.
+        Used to track whether we are inside nested objects or arrays.
+        """
         if char == "{":
             state["brace_level"] = int(state["brace_level"]) + 1
         elif char == "}":
@@ -201,6 +224,10 @@ class QueryPreprocessor:
     def _should_split_here(
         self, char: str, delimiter: str, state: dict[str, int | bool]
     ) -> bool:
+        """
+        Determine if we should split at the current character.
+        Only split if the character matches the delimiter and we are not inside a string, object, or array.
+        """
         return (
             char == delimiter
             and int(state["brace_level"]) == 0
