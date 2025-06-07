@@ -140,9 +140,6 @@
   "schedule": ["before 9am on monday"],
   "prNotPendingHours": 8,
   "minimumReleaseAge": "3 days",
-  "python": {
-    "installRequirement": false
-  },
   "vulnerabilityAlerts": {
     "enabled": true,
     "labels": ["security"]
