@@ -137,7 +137,7 @@
   "automergeType": "pr",
   "platformAutomerge": true,
   "dependencyDashboard": true,
-  "schedule": ["before 9am on monday"],
+  "schedule": ["at any time"],
   "prNotPendingHours": 8,
   "minimumReleaseAge": "3 days",
   "vulnerabilityAlerts": {
