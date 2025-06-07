@@ -3,17 +3,13 @@
   "extends": ["config:recommended"],
   "prHourlyLimit": 10,
   "rebaseWhen": "behind-base-branch",
-  "lockFileMaintenance": {
-    "enabled": true,
-    "automerge": true,
-    "addLabels": ["lockfile"]
-  },
-  "labels": ["dependencies", "python", "pip", "github-actions"],
+  "labels": ["dependencies", "python"],
   "packageRules": [
     {
+      "description": "Automerge patch updates for Python dependencies",
       "matchManagers": [
         "pip_requirements",
-        "pip_setup",
+        "pep621",
         "pipenv",
         "poetry",
         "github-actions"
@@ -24,9 +20,10 @@
       "autoApprove": true
     },
     {
+      "description": "Review minor updates for Python dependencies",
       "matchManagers": [
         "pip_requirements",
-        "pip_setup",
+        "pep621",
         "pipenv",
         "poetry",
         "github-actions"
@@ -37,9 +34,10 @@
       "autoApprove": false
     },
     {
+      "description": "Review major updates for Python dependencies",
       "matchManagers": [
         "pip_requirements",
-        "pip_setup",
+        "pep621",
         "pipenv",
         "poetry",
         "github-actions"
@@ -50,9 +48,10 @@
       "autoApprove": false
     },
     {
+      "description": "Automerge pin updates",
       "matchManagers": [
         "pip_requirements",
-        "pip_setup",
+        "pep621",
         "pipenv",
         "poetry",
         "github-actions"
@@ -63,9 +62,10 @@
       "autoApprove": true
     },
     {
+      "description": "Automerge digest updates",
       "matchManagers": [
         "pip_requirements",
-        "pip_setup",
+        "pep621",
         "pipenv",
         "poetry",
         "github-actions"
@@ -76,9 +76,10 @@
       "autoApprove": true
     },
     {
+      "description": "Automerge bump updates",
       "matchManagers": [
         "pip_requirements",
-        "pip_setup",
+        "pep621",
         "pipenv",
         "poetry",
         "github-actions"
@@ -87,12 +88,64 @@
       "automerge": true,
       "addLabels": ["bump"],
       "autoApprove": true
+    },
+    {
+      "description": "Group development dependencies",
+      "matchManagers": ["pip_requirements", "pep621"],
+      "matchFileNames": ["requirements-dev.txt", "pyproject.toml"],
+      "matchDepTypes": ["optional-dependencies"],
+      "groupName": "development dependencies",
+      "addLabels": ["dev-dependencies"]
+    },
+    {
+      "description": "Group production dependencies",
+      "matchManagers": ["pip_requirements", "pep621"],
+      "matchFileNames": ["requirements.txt", "pyproject.toml"],
+      "matchDepTypes": ["dependencies"],
+      "groupName": "production dependencies",
+      "addLabels": ["prod-dependencies"]
+    },
+    {
+      "description": "Group testing framework updates",
+      "matchPackageNames": ["pytest", "pytest-cov", "pytest-*"],
+      "groupName": "testing framework",
+      "addLabels": ["testing"]
+    },
+    {
+      "description": "Group code quality tools",
+      "matchPackageNames": ["black", "ruff", "mypy", "bandit"],
+      "groupName": "code quality tools",
+      "addLabels": ["code-quality"]
+    },
+    {
+      "description": "Special handling for PyQt5 - major updates need careful review",
+      "matchPackageNames": ["PyQt5"],
+      "matchUpdateTypes": ["major"],
+      "reviewers": ["radosnystudent"],
+      "addLabels": ["gui-framework", "breaking-change"],
+      "autoApprove": false,
+      "prPriority": 10
+    },
+    {
+      "description": "Separate PyQt5 and related GUI packages",
+      "matchPackageNames": ["PyQt5*", "pyqt5*"],
+      "groupName": "PyQt5 GUI framework",
+      "addLabels": ["gui-framework"],
+      "reviewers": ["radosnystudent"]
     }
   ],
   "automergeType": "pr",
   "platformAutomerge": true,
   "dependencyDashboard": true,
-  "schedule": ["at any time"],
+  "schedule": ["before 9am on monday"],
   "prNotPendingHours": 8,
-  "minimumReleaseAge": null
+  "minimumReleaseAge": "3 days",
+  "python": {
+    "installRequirement": false
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"]
+  },
+  "timezone": "UTC"
 }
