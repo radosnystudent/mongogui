@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -188,7 +188,7 @@ class TestMongoClientWrapper:
         self, mongo_wrapper: MongoClientWrapper
     ) -> None:
         """Test run_aggregate without connection."""
-        pipeline: List[Dict[str, Any]] = []
+        pipeline: list[dict[str, Any]] = []
         result = mongo_wrapper.run_aggregate("test_db", "test_collection", pipeline)
         assert result == "Not connected to database"
 

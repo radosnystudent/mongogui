@@ -1,5 +1,5 @@
 import json
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any
 
 from PyQt5.QtWidgets import (
     QComboBox,
@@ -32,12 +32,12 @@ INDEX_TYPE_CHOICES = [
 
 
 class IndexDialog(QDialog):
-    def __init__(self, indexes: List[dict], parent: Optional[QWidget] = None) -> None:
+    def __init__(self, indexes: list[dict], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Manage Indexes")
         self.setMinimumSize(700, 400)
         self.indexes = indexes
-        self.selected_index_name: Optional[str] = None
+        self.selected_index_name: str | None = None
         self.init_ui()
 
     def init_ui(self) -> None:
@@ -111,16 +111,16 @@ class IndexDialog(QDialog):
         self.done(4)  # Custom code for remove
         self.selected_index_name = None  # Clear selection after removal
 
-    def get_selected_index_name(self) -> Optional[str]:
+    def get_selected_index_name(self) -> str | None:
         return self.selected_index_name
 
-    def get_index_data(self) -> Optional[dict]:
+    def get_index_data(self) -> dict | None:
         return getattr(self, "accepted_data", None)
 
 
 class IndexEditDialog(QDialog):
     def __init__(
-        self, index: Optional[dict] = None, parent: Optional[QWidget] = None
+        self, index: dict | None = None, parent: QWidget | None = None
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Edit Index" if index else "Add Index")
@@ -268,7 +268,7 @@ class IndexEditDialog(QDialog):
             except Exception:
                 keys = []
         for pair in keys:
-            if isinstance(pair, (list, tuple)) and len(pair) == 2:
+            if isinstance(pair, list | tuple) and len(pair) == 2:
                 row = self.fields_table.rowCount()
                 self.fields_table.insertRow(row)
                 self.fields_table.setItem(row, 0, QTableWidgetItem(str(pair[0])))
@@ -308,7 +308,7 @@ class IndexEditDialog(QDialog):
             self.fields_table.removeRow(selected)
 
     def _get_index_keys(self) -> list:
-        keys: List[Tuple[str, Union[int, str]]] = []
+        keys: list[tuple[str, int | str]] = []
         for row in range(self.fields_table.rowCount()):
             field_item = self.fields_table.item(row, 0)
             value_item = self.fields_table.item(row, 1)
@@ -316,7 +316,7 @@ class IndexEditDialog(QDialog):
                 continue
             field = field_item.text()
             value_str = value_item.text()
-            value: Union[int, str]
+            value: int | str
             if value_str == INDEX_TYPE_ASC:
                 value = 1
             elif value_str == INDEX_TYPE_DESC:
@@ -336,9 +336,9 @@ class IndexEditDialog(QDialog):
             keys.append((field, value))
         return keys
 
-    def _get_index_options(self) -> Dict[str, Any]:
+    def _get_index_options(self) -> dict[str, Any]:
         """Extract index options from dialog fields, minimizing cognitive complexity."""
-        options: Dict[str, Any] = {}
+        options: dict[str, Any] = {}
         # Use a tuple of (attribute, option_name, type, parse_func)
         option_fields = [
             ("unique_checkbox", "unique", bool, lambda w: w.isChecked()),
@@ -381,11 +381,11 @@ class IndexEditDialog(QDialog):
             return v
         return None
 
-    def get_index_data(self, /) -> Optional[dict]:
+    def get_index_data(self, /) -> dict | None:
         # Refactored to reduce cognitive complexity
         keys = self._get_index_keys()
         options = self._get_index_options()
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "name": self.name_edit.text(),
             "key": keys,
         }

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any
 
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
@@ -10,7 +10,7 @@ NOT_CONNECTED_MSG = "Not connected to database"
 
 class MongoClientWrapper:
     def __init__(self) -> None:
-        self.client: Optional[MongoClient[Dict[str, Any]]] = None
+        self.client: MongoClient[dict[str, Any]] | None = None
         self.current_db: str = ""
 
     def connect(
@@ -18,8 +18,8 @@ class MongoClientWrapper:
         ip: str,
         port: int,
         db: str,
-        login: Optional[str],
-        password: Optional[str],
+        login: str | None,
+        password: str | None,
         tls: bool,
     ) -> bool:
         try:
@@ -28,7 +28,7 @@ class MongoClientWrapper:
             else:
                 uri = f"mongodb://{ip}:{port}/{db}"
 
-            options: Dict[str, Any] = {}
+            options: dict[str, Any] = {}
             if tls:
                 options["tls"] = True
 
@@ -41,7 +41,7 @@ class MongoClientWrapper:
         except PyMongoError:
             return False
 
-    def list_collections(self) -> List[str]:
+    def list_collections(self) -> list[str]:
         """List all collections in the current database."""
         if self.client is None:
             return []
@@ -54,7 +54,7 @@ class MongoClientWrapper:
 
     def execute_query(
         self, query_text: str, explain: bool = False
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any], str]:
+    ) -> list[dict[str, Any]] | dict[str, Any] | str:
         """Execute a MongoDB query from text and return results. If explain is True, return the query plan."""
         if self.client is None:
             return NOT_CONNECTED_MSG
@@ -72,7 +72,7 @@ class MongoClientWrapper:
 
     def _execute_find_query(
         self, query_text: str, explain: bool = False
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any], str]:
+    ) -> list[dict[str, Any]] | dict[str, Any] | str:
         """Execute a find query. If explain is True, return the query plan."""
         try:
             import re
@@ -105,7 +105,7 @@ class MongoClientWrapper:
 
     def _execute_aggregate_query(
         self, query_text: str, explain: bool = False
-    ) -> Union[List[Dict[str, Any]], Dict[str, Any], str]:
+    ) -> list[dict[str, Any]] | dict[str, Any] | str:
         """Execute an aggregate query. If explain is True, return the query plan."""
         try:
             import re
@@ -142,8 +142,8 @@ class MongoClientWrapper:
             return f"Aggregate query error: {str(e)}"
 
     def run_query(
-        self, db_name: str, collection_name: str, query_dict: Dict[str, Any]
-    ) -> Union[List[Dict[str, Any]], str]:
+        self, db_name: str, collection_name: str, query_dict: dict[str, Any]
+    ) -> list[dict[str, Any]] | str:
         """Run a query with specified parameters."""
         try:
             if self.client is None:
@@ -157,8 +157,8 @@ class MongoClientWrapper:
             return str(e)
 
     def run_aggregate(
-        self, db_name: str, collection_name: str, pipeline: List[Dict[str, Any]]
-    ) -> Union[List[Dict[str, Any]], str]:
+        self, db_name: str, collection_name: str, pipeline: list[dict[str, Any]]
+    ) -> list[dict[str, Any]] | str:
         """Run an aggregation pipeline."""
         try:
             if self.client is None:
@@ -172,7 +172,7 @@ class MongoClientWrapper:
             return str(e)
 
     def update_document(
-        self, collection_name: str, doc_id: Any, new_doc: Dict[str, Any]
+        self, collection_name: str, doc_id: Any, new_doc: dict[str, Any]
     ) -> bool:
         """Update a document by _id in the given collection."""
         if self.client is None:
@@ -188,7 +188,7 @@ class MongoClientWrapper:
         except Exception:
             return False
 
-    def list_indexes(self, collection_name: str) -> Union[List[Dict[str, Any]], str]:
+    def list_indexes(self, collection_name: str) -> list[dict[str, Any]] | str:
         """List all indexes for a collection."""
         if self.client is None:
             return NOT_CONNECTED_MSG
@@ -201,8 +201,8 @@ class MongoClientWrapper:
             return f"List indexes error: {str(e)}"
 
     def create_index(
-        self, collection_name: str, keys: List[Any], **kwargs: Any
-    ) -> Union[str, Any]:
+        self, collection_name: str, keys: list[Any], **kwargs: Any
+    ) -> str | Any:
         """Create an index on a collection. Keys is a list of (field, direction) tuples."""
         if self.client is None:
             return NOT_CONNECTED_MSG
@@ -214,7 +214,7 @@ class MongoClientWrapper:
         except Exception as e:
             return f"Create index error: {str(e)}"
 
-    def drop_index(self, collection_name: str, index_name: str) -> Union[bool, str]:
+    def drop_index(self, collection_name: str, index_name: str) -> bool | str:
         """Drop an index by name from a collection."""
         if self.client is None:
             return NOT_CONNECTED_MSG
@@ -227,8 +227,8 @@ class MongoClientWrapper:
             return f"Drop index error: {str(e)}"
 
     def update_index(
-        self, collection_name: str, index_name: str, keys: List[Any], **kwargs: Any
-    ) -> Union[str, Any]:
+        self, collection_name: str, index_name: str, keys: list[Any], **kwargs: Any
+    ) -> str | Any:
         """Update an index by dropping and recreating it."""
         drop_result = self.drop_index(collection_name, index_name)
         if drop_result is not True:
