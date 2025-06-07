@@ -3,6 +3,7 @@ from typing import Any
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
+from core.query_preprocessor import query_preprocessor
 from core.utils import convert_to_object_id
 
 NOT_CONNECTED_MSG = "Not connected to database"
@@ -33,9 +34,7 @@ class MongoClientWrapper:
                 options["tls"] = True
 
             self.client = MongoClient(uri, **options)
-            self.current_db = db
-
-            # Test connection
+            self.current_db = db  # Test connection
             self.client.admin.command("ping")
             return True
         except PyMongoError:
@@ -60,11 +59,16 @@ class MongoClientWrapper:
             return NOT_CONNECTED_MSG
 
         try:
+            # Preprocess the query to support user-friendly syntax
+            preprocessed_query = query_preprocessor.preprocess_query(query_text)
+
             # Simple query parsing - this is a basic implementation
-            if "find(" in query_text:
-                return self._execute_find_query(query_text, explain=explain)
-            elif "aggregate(" in query_text:
-                return self._execute_aggregate_query(query_text, explain=explain)
+            if "find(" in preprocessed_query:
+                return self._execute_find_query(preprocessed_query, explain=explain)
+            elif "aggregate(" in preprocessed_query:
+                return self._execute_aggregate_query(
+                    preprocessed_query, explain=explain
+                )
             else:
                 return "Unsupported query type"
         except Exception as e:

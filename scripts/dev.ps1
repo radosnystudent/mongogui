@@ -5,7 +5,7 @@ param(
     [string]$Command = "help"
 )
 
-function Show-Help {
+function Get-Help {
     Write-Host "Available commands:" -ForegroundColor Green
     Write-Host "  install        Install production dependencies" -ForegroundColor Cyan
     Write-Host "  install-dev    Install development dependencies" -ForegroundColor Cyan
@@ -26,12 +26,12 @@ function Show-Help {
     Write-Host "Usage: .\dev.ps1 <command>" -ForegroundColor Yellow
 }
 
-function Install-Prod {
+function Install-ProductionDependencies {
     Write-Host "Installing production dependencies..." -ForegroundColor Green
     pip install -r requirements.txt
 }
 
-function Install-Dev {
+function Install-DevelopmentDependencies {
     Write-Host "Installing development dependencies..." -ForegroundColor Green
     pip install -r requirements.txt -r requirements-dev.txt
 }
@@ -41,48 +41,48 @@ function Format-Code {
     black .
 }
 
-function Check-Format {
+function Test-Format {
     Write-Host "Checking code formatting with Black..." -ForegroundColor Green
     black --check .
 }
 
-function Lint-Code {
+function Invoke-Lint {
     Write-Host "Linting code with Ruff..." -ForegroundColor Green
     ruff check .
 }
 
-function Lint-Fix {
+function Invoke-LintFix {
     Write-Host "Linting and fixing code with Ruff..." -ForegroundColor Green
     ruff check --fix .
 }
 
-function Type-Check {
+function Test-Type {
     Write-Host "Running type checking with Mypy..." -ForegroundColor Green
     mypy .
 }
 
-function Security-Check {
+function Test-Security {
     Write-Host "Running security checks with Bandit..." -ForegroundColor Green
     bandit -r . -f json -o bandit-report.json
     bandit -r .
 }
 
-function Run-Tests {
+function Test-Unit {
     Write-Host "Running tests with pytest..." -ForegroundColor Green
     pytest
 }
 
-function Run-Tests-Cov {
+function Test-CodeCoverage {
     Write-Host "Running tests with coverage..." -ForegroundColor Green
     pytest --cov=. --cov-report=html --cov-report=term
 }
 
-function Build-Package {
+function New-Package {
     Write-Host "Building package..." -ForegroundColor Green
     python -m build
 }
 
-function Clean-Artifacts {
+function Remove-BuildArtifacts {
     Write-Host "Cleaning build artifacts..." -ForegroundColor Green
     if (Test-Path "build") { Remove-Item -Recurse -Force "build" }
     if (Test-Path "dist") { Remove-Item -Recurse -Force "dist" }
@@ -95,26 +95,26 @@ function Clean-Artifacts {
     if (Test-Path "bandit-report.json") { Remove-Item -Force "bandit-report.json" }
 }
 
-function Run-All {
+function Invoke-All {
     Write-Host "Running all checks..." -ForegroundColor Green
     Format-Code
-    Lint-Code
-    Type-Check
-    Security-Check
-    Run-Tests
+    Invoke-Lint
+    Test-Type
+    Test-Security
+    Test-Unit
 }
 
-function Run-AllChecks {
+function Invoke-AllChecks {
     Write-Host "Running all static checks and tests..." -ForegroundColor Green
-    Lint-Code
-    Type-Check
-    Check-Format
-    Run-Tests
+    Invoke-Lint
+    Test-Type
+    Test-Format
+    Test-Unit
 }
 
-function Dev-Setup {
+function Initialize-DevelopmentEnvironment {
     Write-Host "Setting up development environment..." -ForegroundColor Green
-    Install-Dev
+    Install-DevelopmentDependencies
     Write-Host "Development environment setup complete!" -ForegroundColor Green
     Write-Host "Run '.\dev.ps1 help' to see available commands." -ForegroundColor Yellow
 }
@@ -122,24 +122,24 @@ function Dev-Setup {
 # Update python version check or shebang if present
 
 switch ($Command.ToLower()) {
-    "help" { Show-Help }
-    "install" { Install-Prod }
-    "install-dev" { Install-Dev }
+    "help" { Get-Help }
+    "install" { Install-ProductionDependencies }
+    "install-dev" { Install-DevelopmentDependencies }
     "format" { Format-Code }
-    "format-check" { Check-Format }
-    "lint" { Lint-Code }
-    "lint-fix" { Lint-Fix }
-    "type-check" { Type-Check }
-    "security" { Security-Check }
-    "test" { Run-Tests }
-    "test-cov" { Run-Tests-Cov }
-    "build" { Build-Package }
-    "clean" { Clean-Artifacts }
-    "all" { Run-All }
-    "all-checks" { Run-AllChecks }
-    "dev-setup" { Dev-Setup }
-    default { 
+    "format-check" { Test-Format }
+    "lint" { Invoke-Lint }
+    "lint-fix" { Invoke-LintFix }
+    "type-check" { Test-Type }
+    "security" { Test-Security }
+    "test" { Test-Unit }
+    "test-cov" { Test-CodeCoverage }
+    "build" { New-Package }
+    "clean" { Remove-BuildArtifacts }
+    "all" { Invoke-All }
+    "all-checks" { Invoke-AllChecks }
+    "dev-setup" { Initialize-DevelopmentEnvironment }
+    default {
         Write-Host "Unknown command: $Command" -ForegroundColor Red
-        Show-Help 
+        Get-Help
     }
 }
