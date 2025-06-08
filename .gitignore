@@ -176,3 +176,5 @@ cython_debug/
 connections/
 
 copilot-instructions.md
+
+.vscode/

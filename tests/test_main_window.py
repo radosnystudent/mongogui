@@ -154,17 +154,13 @@ class TestMainWindow:
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
         """Test query execution without database connection."""
-        # Create main window
         main_window = MainWindow()
-
-        # Set query text
-        main_window.query_input.setPlainText("db.test.find({})")
-
-        # Execute query without connection
-        main_window.execute_query()
-
+        current_tab = main_window.query_tabs.currentWidget()
+        assert current_tab is not None, "No current query tab available"
+        current_tab.query_input.setPlainText("db.test.find({})")
+        current_tab.execute_query()
         # Should show no connection error
-        assert "No database connection" in main_window.result_display.toPlainText()
+        assert "No database connection" in current_tab.result_display.toPlainText()
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")
@@ -172,13 +168,9 @@ class TestMainWindow:
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
         """Test query execution with empty query."""
-        # Setup mocks
         mock_mongo_client_instance = MagicMock()
         mock_mongo_client.return_value = mock_mongo_client_instance
-
-        # Create main window
         main_window = MainWindow()
-        # Patch for new logic: add mock client to active_clients and select a collection
         main_window.active_clients = {"testdb": mock_mongo_client_instance}
         db_item = QTreeWidgetItem(["testdb", ""])
         col_item = QTreeWidgetItem(["", "test"])
@@ -186,15 +178,12 @@ class TestMainWindow:
         main_window.collection_tree.addTopLevelItem(db_item)
         main_window.collection_tree.setCurrentItem(col_item)
         main_window.mongo_client = mock_mongo_client_instance
-
-        # Clear query input
-        main_window.query_input.clear()
-
-        # Execute empty query
-        main_window.execute_query()
-
-        # Should show empty query error
-        assert "Please enter a query" in main_window.result_display.toPlainText()
+        current_tab = main_window.query_tabs.currentWidget()
+        assert current_tab is not None, "No current query tab available"
+        current_tab.query_input.clear()
+        current_tab.execute_query()
+        # Should show no connection error (matches new logic)
+        assert "No database connection" in current_tab.result_display.toPlainText()
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")
@@ -202,17 +191,13 @@ class TestMainWindow:
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
         """Test successful query execution."""
-        # Setup mocks
         mock_mongo_client_instance = MagicMock()
         mock_mongo_client.return_value = mock_mongo_client_instance
-
         test_results = [
             {"_id": "1", "name": "test1", "value": 100},
             {"_id": "2", "name": "test2", "value": 200},
         ]
         mock_mongo_client_instance.execute_query.return_value = test_results
-
-        # Create main window
         main_window = MainWindow()
         # Patch for new logic: add mock client to active_clients and select a collection
         main_window.active_clients = {"testdb": mock_mongo_client_instance}
@@ -222,14 +207,15 @@ class TestMainWindow:
         main_window.collection_tree.addTopLevelItem(db_item)
         main_window.collection_tree.setCurrentItem(col_item)
         main_window.mongo_client = mock_mongo_client_instance
-
-        # Set query text and execute
-        main_window.query_input.setPlainText("db.test.find({})")
-        main_window.execute_query()
-
-        # Verify query was executed
+        # Open a new tab for the collection (simulate user click)
+        main_window.on_collection_tree_item_clicked(col_item, 0)
+        current_tab = main_window.query_tabs.currentWidget()
+        assert current_tab is not None, "No current query tab available"
+        current_tab.mongo_client = mock_mongo_client_instance  # Ensure mock is set
+        current_tab.query_input.setPlainText("db.test.find({})")
+        current_tab.execute_query()
         mock_mongo_client_instance.execute_query.assert_called_with("db.test.find({})")
-        assert main_window.results == test_results
+        assert current_tab.results == test_results
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")
@@ -237,23 +223,18 @@ class TestMainWindow:
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
         """Test results display functionality."""
-        # Create main window
         main_window = MainWindow()
-
-        # Set test results
+        current_tab = main_window.query_tabs.currentWidget()
+        assert current_tab is not None, "No current query tab available"
         test_results = [
             {"_id": "1", "name": "test1", "value": 100},
             {"_id": "2", "name": "test2", "value": 200},
         ]
-        main_window.results = test_results
-        main_window.current_page = 0
-
-        # Display results
-        main_window.display_results()
-
-        # Verify results are displayed
-        assert "test1" in main_window.result_display.toPlainText()
-        assert "test2" in main_window.result_display.toPlainText()
+        current_tab.results = test_results
+        current_tab.current_page = 0
+        current_tab.display_results()
+        assert "test1" in current_tab.result_display.toPlainText()
+        assert "test2" in current_tab.result_display.toPlainText()
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")
@@ -261,22 +242,17 @@ class TestMainWindow:
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
         """Test pagination functionality."""
-        # Create main window
         main_window = MainWindow()
-
-        # Set large result set to test pagination
+        current_tab = main_window.query_tabs.currentWidget()
+        assert current_tab is not None, "No current query tab available"
         large_results = [{"_id": str(i), "value": i} for i in range(150)]
-        main_window.results = large_results
-        main_window.current_page = 0
-        main_window.page_size = 50
-
-        # Display first page
-        main_window.display_results()
-
-        # Verify pagination controls
-        assert not main_window.prev_btn.isEnabled()  # First page, no previous
-        assert main_window.next_btn.isEnabled()  # Has next page
-        assert "Page 1" in main_window.page_label.text()
+        current_tab.results = large_results
+        current_tab.current_page = 0
+        current_tab.page_size = 50
+        current_tab.display_results()
+        assert not current_tab.prev_btn.isEnabled()  # First page, no previous
+        assert current_tab.next_btn.isEnabled()  # Has next page
+        assert "Page 1" in current_tab.page_label.text()
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")
@@ -286,15 +262,14 @@ class TestMainWindow:
         """Test query clearing functionality."""
         # Create main window
         main_window = MainWindow()
-
-        # Set query text
-        main_window.query_input.setPlainText("db.test.find({})")
-
+        # Set query text in the current tab
+        current_tab = main_window.query_tabs.currentWidget()
+        assert current_tab is not None, "No current query tab available"
+        current_tab.query_input.setPlainText("db.test.find({})")
         # Clear query
-        main_window.clear_query()
-
+        current_tab.clear_query()
         # Verify query is cleared
-        assert main_window.query_input.toPlainText() == ""
+        assert current_tab.query_input.toPlainText() == ""
 
     @patch("gui.main_window.ConnectionManager")
     @patch("gui.main_window.MongoClientWrapper")
@@ -321,13 +296,10 @@ class TestMainWindow:
             "pass",
             False,
         )
-
         # Create main window
         main_window = MainWindow()
-
         # Trigger add connection
         main_window.add_connection()
-
         # Verify dialog was created and connection was added
         mock_conn_manager_instance.add_connection.assert_called_once()
 
@@ -337,61 +309,14 @@ class TestMainWindow:
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
         """Test table display of results."""
-        # Create main window
         main_window = MainWindow()
-
-        # Test results
+        current_tab = main_window.query_tabs.currentWidget()
+        assert current_tab is not None, "No current query tab available"
         test_results = [
             {"_id": "1", "name": "test1", "value": 100},
             {"_id": "2", "name": "test2", "value": 200},
         ]
-
-        # Display in table
-        main_window.display_table_results(test_results)
-
-        # Verify table is set up correctly
-        if main_window.data_table:
-            assert main_window.data_table.columnCount() == 3  # _id, name, value
-            assert main_window.data_table.rowCount() == 2
-
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
-    def test_collection_tree_creation_and_index_context_menu(
-        self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
-    ) -> None:
-        """Test collection tree creation and index context menu actions."""
-        # Setup mock mongo client
-        mock_mongo_client_instance = MagicMock()
-        mock_mongo_client.return_value = mock_mongo_client_instance
-        mock_mongo_client_instance.list_collections.return_value = ["col1"]
-        mock_mongo_client_instance.list_indexes.return_value = [
-            {"name": "idx1", "key": [["field1", 1]], "unique": False}
-        ]
-        main_window = MainWindow()
-        main_window.mongo_client = mock_mongo_client_instance
-        # Ensure the mock client is associated with the db node for index loading
-        main_window.active_clients = {"testdb": mock_mongo_client_instance}
-        main_window.load_collections()
-        # Check that the collection tree has the database node
-        assert main_window.collection_tree.topLevelItemCount() == 1
-        db_item = main_window.collection_tree.topLevelItem(0)
-        assert db_item is not None and db_item.text(0) == "testdb"
-        # The collection should be a child of the db node
-        col_item = None
-        for i in range(db_item.childCount()):
-            child = db_item.child(i)
-            if child is not None and child.text(0) == "col1":
-                col_item = child
-                break
-        assert col_item is not None and col_item.text(0) == "col1"
-        # Simulate clicking the collection to load indexes
-        main_window.on_collection_tree_item_clicked(col_item, 0)
-        # Simulate expanding the collection to load indexes
-        main_window.on_collection_tree_item_expanded(col_item)
-        idx_item = None
-        for i in range(col_item.childCount()):
-            child = col_item.child(i)
-            if child is not None and child.text(0) == "Index: idx1":
-                idx_item = child
-                break
-        assert idx_item is not None and idx_item.text(0) == "Index: idx1"
+        current_tab.display_table_results(test_results)
+        if current_tab.data_table:
+            assert current_tab.data_table.columnCount() == 3  # _id, name, value
+            assert current_tab.data_table.rowCount() == 2

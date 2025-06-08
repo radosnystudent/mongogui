@@ -7,13 +7,12 @@ from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QHBoxLayout,
-    QLabel,
     QMainWindow,
     QMessageBox,
     QPushButton,
-    QSplitter,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
@@ -29,6 +28,7 @@ from gui.connection_widgets import ConnectionWidgetsMixin
 from gui.constants import EDIT_DOCUMENT_TITLE
 from gui.edit_document_dialog import EditDocumentDialog
 from gui.query_panel import QueryPanelMixin
+from gui.query_tab import QueryTabWidget
 from gui.ui_utils import set_minimum_heights
 
 bson_dumps: Callable[..., str] | None
@@ -64,6 +64,10 @@ class MainWindow(
         self.last_collection: str = ""  # keep as str for mixin compatibility
         self.data_table: QTableWidget | None = None
         self.json_tree: QTreeWidget | None = None
+        self.query_tabs = QTabWidget()
+        self.query_tabs.setTabsClosable(True)
+        self.query_tabs.tabCloseRequested.connect(self._close_query_tab)
+        self.query_tabs.setMovable(True)
 
         # Hidden result display for test compatibility
         self.result_display = QTextEdit()
@@ -81,8 +85,6 @@ class MainWindow(
         )  # Not used, but prevents AttributeError in tests
 
         self.setup_ui()
-
-        # Load connections at startup
         self.load_connections()
 
     def setup_ui(self) -> None:
@@ -121,87 +123,60 @@ class MainWindow(
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
 
-        # Query input
-        query_label = QLabel("Query:")
-        right_layout.addWidget(query_label)
-
-        self.query_input = QTextEdit()
-        self.query_input.setFixedHeight(100)
-        self.query_input.setPlaceholderText(
-            "Enter MongoDB query (e.g., db.collection.find({}))"
-        )
-        right_layout.addWidget(self.query_input)
-
-        # Query controls
-        query_controls = QHBoxLayout()
-
-        execute_btn = QPushButton("Execute")
-        execute_btn.clicked.connect(self.execute_query)
-        query_controls.addWidget(execute_btn)
-
-        explain_btn = QPushButton("Explain")
-        explain_btn.setToolTip("Show query plan and index usage for this query")
-        explain_btn.clicked.connect(self.execute_explain)
-        query_controls.addWidget(explain_btn)
-
-        clear_btn = QPushButton("Clear")
-        clear_btn.clicked.connect(self.clear_query)
-        query_controls.addWidget(clear_btn)
-
-        query_controls.addStretch()
-        right_layout.addLayout(query_controls)
-
-        # Results display
-        results_label = QLabel("Results:")
-        # Add spacing above Results label
-        right_layout.addSpacing(30)
-        right_layout.addWidget(results_label)
-
-        # Results navigation
-        nav_layout = QHBoxLayout()
-
-        self.prev_btn = QPushButton("Previous")
-        self.prev_btn.clicked.connect(self.previous_page)
-        self.prev_btn.setEnabled(False)
-        nav_layout.addWidget(self.prev_btn)
-
-        self.page_label = QLabel("Page 1")
-        nav_layout.addWidget(self.page_label)
-
-        self.next_btn = QPushButton("Next")
-        self.next_btn.clicked.connect(self.next_page)
-        self.next_btn.setEnabled(False)
-        nav_layout.addWidget(self.next_btn)
-
-        nav_layout.addStretch()
-
-        self.result_count_label = QLabel("")
-        nav_layout.addWidget(self.result_count_label)
-
-        right_layout.addLayout(nav_layout)
-
-        # Results area using splitter
-        results_splitter = QSplitter()
-        results_splitter.setOrientation(Qt.Orientation.Vertical)
-
-        # Table view
-        self.data_table = QTableWidget()
-        results_splitter.addWidget(self.data_table)
-
-        # JSON tree view
-        self.json_tree = QTreeWidget()
-        self.json_tree.setHeaderLabels(["Key", "Value"])
-        results_splitter.addWidget(self.json_tree)
-        self.json_tree.hide()
-
-        # Connect context menu signals only once
-        self.setup_query_panel_signals()
-
-        results_splitter.setSizes([400, 200])
-        right_layout.addWidget(results_splitter, stretch=1)
+        # Add query tabs widget
+        right_layout.addWidget(self.query_tabs, stretch=1)
 
         right_panel.setLayout(right_layout)
         main_layout.addWidget(right_panel, stretch=1)
+
+        # Add initial tab
+        self.add_query_tab()
+
+    def add_query_tab(
+        self, collection_name: str | None = None, db_label: str | None = None
+    ) -> None:
+        mongo_client = None
+        if (
+            db_label
+            and hasattr(self, "active_clients")
+            and db_label in self.active_clients
+        ):
+            mongo_client = self.active_clients[db_label]
+        tab = QueryTabWidget(
+            parent=self,
+            collection_name=collection_name,
+            db_label=db_label,
+            mongo_client=mongo_client,
+            on_close=self._close_query_tab_by_widget,
+        )
+        tab_title = collection_name if collection_name else "New Query"
+        self.query_tabs.addTab(tab, tab_title)
+        self.query_tabs.setCurrentWidget(tab)
+
+    def _close_query_tab(self, index: int) -> None:
+        widget = self.query_tabs.widget(index)
+        if widget:
+            self.query_tabs.removeTab(index)
+            widget.deleteLater()
+        if self.query_tabs.count() == 0:
+            self.add_query_tab()
+
+    def _close_query_tab_by_widget(self, widget: QWidget) -> None:
+        index = self.query_tabs.indexOf(widget)
+        if index != -1:
+            self._close_query_tab(index)
+
+    def on_collection_tree_item_clicked(
+        self, item: QTreeWidgetItem, column: int
+    ) -> None:
+        data = item.data(0, int(Qt.ItemDataRole.UserRole))
+        if data and data.get("type") == "collection":
+            collection_name = data["name"]
+            parent = item.parent()
+            db_label = parent.text(0) if parent is not None else ""
+            # Open a new tab for this collection
+            self.add_query_tab(collection_name=collection_name, db_label=db_label)
+        # ...existing code for index/context menu...
 
     def execute_query(self) -> None:
         selected_item = self.collection_tree.currentItem()
