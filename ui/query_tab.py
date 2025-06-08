@@ -132,6 +132,8 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
     # ...existing code for QueryPanelMixin methods...
 
     def display_results(self) -> None:
+        self._reset_ui_for_query_results()  # Added this line to reset UI state
+
         self.setup_query_panel_signals()
         if not self.results:
             self.result_display.setPlainText("No results")

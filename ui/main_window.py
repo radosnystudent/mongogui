@@ -129,27 +129,57 @@ class MainWindow(
         right_panel.setLayout(right_layout)
         main_layout.addWidget(right_panel, stretch=1)
 
-        # Add initial tab
-        self.add_query_tab()
+        # Add initial tab only if a connection is active (or for testing)
+        # self.add_query_tab() # Removed initial tab creation here
 
     def add_query_tab(
         self, collection_name: str | None = None, db_label: str | None = None
     ) -> None:
         mongo_client = None
+        active_db_label = db_label
+
         if (
-            db_label
+            active_db_label
             and hasattr(self, "active_clients")
-            and db_label in self.active_clients
+            and active_db_label in self.active_clients
         ):
-            mongo_client = self.active_clients[db_label]
+            mongo_client = self.active_clients[active_db_label]
+        elif (
+            not active_db_label and self.mongo_client
+        ):  # Fallback for a general connection
+            mongo_client = self.mongo_client
+            if self.current_connection:
+                active_db_label = self.current_connection.get("label")
+
+        # Prevent opening a tab if no client is resolved, unless it's the initial state without any tabs.
+        is_initial_empty_state = not self.query_tabs.count() and not (
+            hasattr(self, "active_clients") and self.active_clients
+        )
+        if not mongo_client and not is_initial_empty_state:
+            QMessageBox.information(
+                self, "New Query Tab", "Please connect to a database first."
+            )
+            return
+
+        # If mongo_client is still None here, it means we are in the initial empty state or a connection is missing.
+        # QueryTabWidget can handle a None mongo_client initially.
+
+        actual_collection_name_for_tab = None  # Always open DB-level tabs
+        tab_title = f"Query - {active_db_label}" if active_db_label else "New Query"
+        if collection_name and active_db_label and collection_name != active_db_label:
+            # This case should ideally not be hit if we always open DB tabs
+            # but kept for robustness if collection_name is passed for other reasons.
+            # Forcing DB level tab for now.
+            pass  # tab_title already set for DB level
+
         tab = QueryTabWidget(
             parent=self,
-            collection_name=collection_name,
-            db_label=db_label,
+            collection_name=actual_collection_name_for_tab,  # Explicitly None for DB context
+            db_label=active_db_label,
             mongo_client=mongo_client,
             on_close=self._close_query_tab_by_widget,
         )
-        tab_title = collection_name if collection_name else "New Query"
+
         self.query_tabs.addTab(tab, tab_title)
         self.query_tabs.setCurrentWidget(tab)
 
@@ -158,65 +188,121 @@ class MainWindow(
         if widget:
             self.query_tabs.removeTab(index)
             widget.deleteLater()
-        if self.query_tabs.count() == 0:
-            self.add_query_tab()
+        # Do not automatically add a new tab if the last one is closed.
+        # if self.query_tabs.count() == 0:
+        # self.add_query_tab() # Removed auto-add
 
     def _close_query_tab_by_widget(self, widget: QWidget) -> None:
         index = self.query_tabs.indexOf(widget)
         if index != -1:
             self._close_query_tab(index)
 
+    def _handle_database_click(self, item_name: str) -> None:
+        """Handles clicks on database items in the collection tree."""
+        self.add_query_tab(db_label=item_name, collection_name=None)
+
+    def _handle_collection_click(self, item: QTreeWidgetItem) -> None:
+        """Handles clicks on collection items in the collection tree."""
+        parent_db_item = item.parent()
+        if parent_db_item:
+            db_label = parent_db_item.text(0)
+            self.add_query_tab(db_label=db_label, collection_name=None)
+        else:
+            QMessageBox.warning(
+                self,
+                "Error",
+                "Could not determine database for the selected collection.",
+            )
+
+    def _handle_index_click(self, item: QTreeWidgetItem, item_name: str) -> None:
+        """Handles clicks on index items in the collection tree."""
+        coll_item = item.parent()
+        if not coll_item:
+            QMessageBox.warning(
+                self, "Error", "Could not determine collection for the selected index."
+            )
+            return
+
+        coll_data = coll_item.data(0, int(Qt.ItemDataRole.UserRole))
+        collection_name_for_index = (
+            coll_data.get("name") if coll_data else "Unknown Collection"
+        )
+
+        db_item = coll_item.parent()
+        if not db_item:
+            QMessageBox.warning(
+                self, "Error", "Could not determine database for the selected index."
+            )
+            return
+
+        db_label_for_index = db_item.text(0)
+        QMessageBox.information(
+            self,
+            "Index Clicked",
+            f"Index: {item_name}\nCollection: {collection_name_for_index}\nDatabase: {db_label_for_index}",
+        )
+
     def on_collection_tree_item_clicked(
         self, item: QTreeWidgetItem, column: int
     ) -> None:
         data = item.data(0, int(Qt.ItemDataRole.UserRole))
-        if data and data.get("type") == "collection":
-            collection_name = data["name"]
-            parent = item.parent()
-            db_label = parent.text(0) if parent is not None else ""
-            # Open a new tab for this collection
-            self.add_query_tab(collection_name=collection_name, db_label=db_label)
-        # ...existing code for index/context menu...
+        if not data:
+            return
+
+        item_type = data.get("type")
+        item_name = data.get("name")
+
+        action_map = {
+            "database": lambda: self._handle_database_click(item_name),
+            "collection": lambda: self._handle_collection_click(item),
+            "index": lambda: self._handle_index_click(item, item_name),
+        }
+
+        if item_type in action_map:
+            action_map[item_type]()
+
+        # Context menu logic
+        if item_type in ["collection", "index"]:
+            self.collection_tree.setContextMenuPolicy(
+                Qt.ContextMenuPolicy.CustomContextMenu
+            )
+            self.collection_tree.customContextMenuRequested.connect(
+                lambda pos: self.show_collection_context_menu(item, pos)
+            )
+        else:
+            self.collection_tree.setContextMenuPolicy(
+                Qt.ContextMenuPolicy.DefaultContextMenu
+            )
 
     def execute_query(self) -> None:
-        selected_item = self.collection_tree.currentItem()
-        query_text = self.query_input.toPlainText().strip()
-        if not selected_item or not selected_item.parent():
-            if not query_text:
-                self.result_display.setPlainText("Please enter a query")
-            else:
-                self.result_display.setPlainText(NO_DB_CONNECTION_MSG)
+        current_tab = self.query_tabs.currentWidget()
+        if not isinstance(current_tab, QueryTabWidget):
+            QMessageBox.warning(self, "Query Error", "No active query tab selected.")
             return
-        collection_name = selected_item.text(1)
-        parent_item = selected_item.parent()
-        if parent_item is None:
-            self.result_display.setPlainText(NO_DB_CONNECTION_MSG)
-            return
-        db_label = parent_item.text(0)
-        mongo_client = self.active_clients.get(db_label)
-        if not mongo_client:
-            self.result_display.setPlainText(NO_DB_CONNECTION_MSG)
-            return
-        query_text = self.query_input.toPlainText().strip()
-        if not query_text:
-            self.result_display.setPlainText("Please enter a query")
-            return
-        # Extract collection name from query (e.g., db.collection.find(...))
-        self.last_collection = collection_name
-        try:
-            result = mongo_client.execute_query(query_text)
-            if isinstance(result, list):
-                self.results = result
-                self.current_page = 0
-                self.last_query = query_text
-                self.display_results()
-            else:
-                self.result_display.setPlainText(f"Error: {result}")
-        except Exception as e:
-            self.result_display.setPlainText(f"Query error: {str(e)}")
+
+        # Delegate query execution to the current QueryTabWidget
+        # The QueryTabWidget itself should handle getting the mongo_client and db_label
+        current_tab.execute_query()
+
+        # The following logic for displaying results in MainWindow might be redundant
+        # if QueryTabWidget handles its own display. Review and remove if necessary.
+        # For now, we assume QueryTabWidget updates its own UI.
+        # If MainWindow needs to react to results (e.g. status bar), signals/slots would be better.
+
+    # display_results, display_table_results, display_tree_results, edit_document,
+    # update_document_in_db, add_tree_item, clear_query, previous_page, next_page
+    # are primarily for the QueryPanelMixin and should ideally be managed by QueryTabWidget.
+    # MainWindow might not need its own implementations if QueryTabWidget is self-contained.
+    # For now, let's leave them but note they might become obsolete or need refactoring.
 
     def display_results(self) -> None:
-        if not self.results:
+        # This method in MainWindow might be deprecated if QueryTabWidget handles its own display.
+        # Forwarding to current tab for now, or consider removing.
+        current_tab = self.query_tabs.currentWidget()
+        if isinstance(current_tab, QueryTabWidget):
+            # current_tab.display_results() # QueryTabWidget.display_results will be called by its own execute_query
+            pass  # Results are displayed within the tab itself.
+        elif not self.results:  # Fallback for old direct execution path (if any)
             self.result_display.setPlainText("No results")
             if self.data_table:
                 self.data_table.setRowCount(0)
