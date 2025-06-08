@@ -2,7 +2,7 @@
 
 from bson import ObjectId
 
-from core.utils import convert_to_object_id
+from db.utils import convert_to_object_id
 
 
 class TestUtils:

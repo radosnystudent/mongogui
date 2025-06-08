@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PyQt5.QtWidgets import QApplication, QDialog, QMessageBox, QTreeWidgetItem
 
-from gui.main_window import MainWindow
+from ui.main_window import MainWindow
 
 
 class TestMainWindow:
@@ -19,13 +19,13 @@ class TestMainWindow:
 
         # Create a fully mocked MainWindow
         with (
-            patch("gui.main_window.ConnectionManager"),
-            patch("gui.main_window.MongoClientWrapper"),
+            patch("ui.main_window.ConnectionManager"),
+            patch("ui.main_window.MongoClientWrapper"),
         ):
             self.main_window_class = MainWindow
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_main_window_initialization(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -41,8 +41,8 @@ class TestMainWindow:
         assert main_window.page_size == 50
         assert main_window.results == []
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_load_connections(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -63,8 +63,8 @@ class TestMainWindow:
         # Verify get_connections was called
         mock_conn_manager_instance.get_connections.assert_called()
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_connect_to_database_success(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -94,7 +94,7 @@ class TestMainWindow:
         # Patch exec_ to auto-accept the dialog
         from unittest.mock import patch
 
-        import gui.connection_manager_window as cmw
+        import ui.connection_manager_window as cmw
 
         with (
             patch.object(
@@ -114,8 +114,8 @@ class TestMainWindow:
             "test_conn"
         )
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_connect_to_database_failure(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -128,7 +128,7 @@ class TestMainWindow:
         # Patch exec_ to auto-accept the dialog
         from unittest.mock import patch
 
-        import gui.connection_manager_window as cmw
+        import ui.connection_manager_window as cmw
 
         with (
             patch.object(
@@ -148,8 +148,8 @@ class TestMainWindow:
             "nonexistent_conn"
         )
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_execute_query_no_connection(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -162,8 +162,8 @@ class TestMainWindow:
         # Should show no connection error
         assert "No database connection" in current_tab.result_display.toPlainText()
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_execute_query_empty_query(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -185,8 +185,8 @@ class TestMainWindow:
         # Should show no connection error (matches new logic)
         assert "No database connection" in current_tab.result_display.toPlainText()
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_execute_query_success(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -217,8 +217,8 @@ class TestMainWindow:
         mock_mongo_client_instance.execute_query.assert_called_with("db.test.find({})")
         assert current_tab.results == test_results
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_display_results(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -236,8 +236,8 @@ class TestMainWindow:
         assert "test1" in current_tab.result_display.toPlainText()
         assert "test2" in current_tab.result_display.toPlainText()
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_pagination_controls(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -254,8 +254,8 @@ class TestMainWindow:
         assert current_tab.next_btn.isEnabled()  # Has next page
         assert "Page 1" in current_tab.page_label.text()
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_clear_query(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:
@@ -271,9 +271,9 @@ class TestMainWindow:
         # Verify query is cleared
         assert current_tab.query_input.toPlainText() == ""
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
-    @patch("gui.connection_widgets.ConnectionDialog")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
+    @patch("ui.connection_widgets.ConnectionDialog")
     def test_add_connection_dialog(
         self,
         mock_dialog: MagicMock,
@@ -303,8 +303,8 @@ class TestMainWindow:
         # Verify dialog was created and connection was added
         mock_conn_manager_instance.add_connection.assert_called_once()
 
-    @patch("gui.main_window.ConnectionManager")
-    @patch("gui.main_window.MongoClientWrapper")
+    @patch("ui.main_window.ConnectionManager")
+    @patch("ui.main_window.MongoClientWrapper")
     def test_display_table_results(
         self, mock_mongo_client: MagicMock, mock_conn_manager: MagicMock
     ) -> None:

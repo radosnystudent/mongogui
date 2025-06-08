@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from gui.query_panel import QueryPanelMixin
-from gui.ui_utils import set_minimum_heights
+from ui.query_panel import QueryPanelMixin
+from ui.ui_utils import set_minimum_heights
 
 
 class QueryTabWidget(QWidget, QueryPanelMixin):

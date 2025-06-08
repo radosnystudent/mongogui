@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from gui.index_dialog import IndexDialog
+from ui.index_dialog import IndexDialog
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QTextEdit, QVBoxLayout
@@ -283,7 +283,7 @@ class CollectionPanelMixin:
         return {k: v for k, v in data.items() if k not in ("key", "name")}
 
     def show_edit_index_dialog(self, collection_name: str, index_dict: dict) -> None:
-        from gui.index_dialog import IndexEditDialog
+        from ui.index_dialog import IndexEditDialog
 
         dlg = IndexEditDialog(index_dict, self.collection_tree)
         if dlg.exec_() == QDialog.Accepted:

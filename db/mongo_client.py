@@ -3,8 +3,8 @@ from typing import Any
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
-from core.query_preprocessor import query_preprocessor
-from core.utils import convert_to_object_id
+from db.query_preprocessor import query_preprocessor
+from db.utils import convert_to_object_id
 
 NOT_CONNECTED_MSG = "Not connected to database"
 

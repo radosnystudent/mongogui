@@ -1,9 +1,9 @@
 from unittest.mock import MagicMock, patch
 
-from core.mongo_client import MongoClientWrapper
+from db.mongo_client import MongoClientWrapper
 
 
-@patch("core.mongo_client.MongoClient")
+@patch("db.mongo_client.MongoClient")
 def test_explain_find_query(mock_mongo_client: MagicMock) -> None:
     mock_client_instance = MagicMock()
     mock_mongo_client.return_value = mock_client_instance
@@ -24,7 +24,7 @@ def test_explain_find_query(mock_mongo_client: MagicMock) -> None:
     assert "queryPlanner" in result
 
 
-@patch("core.mongo_client.MongoClient")
+@patch("db.mongo_client.MongoClient")
 def test_explain_aggregate_query(mock_mongo_client: MagicMock) -> None:
     mock_client_instance = MagicMock()
     mock_mongo_client.return_value = mock_client_instance

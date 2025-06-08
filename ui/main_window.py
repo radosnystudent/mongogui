@@ -20,16 +20,16 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from core.connection_manager import ConnectionManager
-from core.mongo_client import MongoClientWrapper
-from core.utils import convert_to_object_id  # Moved import to top
-from gui.collection_panel import CollectionPanelMixin
-from gui.connection_widgets import ConnectionWidgetsMixin
-from gui.constants import EDIT_DOCUMENT_TITLE
-from gui.edit_document_dialog import EditDocumentDialog
-from gui.query_panel import QueryPanelMixin
-from gui.query_tab import QueryTabWidget
-from gui.ui_utils import set_minimum_heights
+from db.connection_manager import ConnectionManager
+from db.mongo_client import MongoClientWrapper
+from db.utils import convert_to_object_id  # Moved import to top
+from ui.collection_panel import CollectionPanelMixin
+from ui.connection_widgets import ConnectionWidgetsMixin
+from ui.constants import EDIT_DOCUMENT_TITLE
+from ui.edit_document_dialog import EditDocumentDialog
+from ui.query_panel import QueryPanelMixin
+from ui.query_tab import QueryTabWidget
+from ui.ui_utils import set_minimum_heights
 
 bson_dumps: Callable[..., str] | None
 try:
@@ -366,7 +366,7 @@ class MainWindow(
         set_minimum_heights(self)
 
     def open_connection_manager_window(self) -> None:
-        from gui.connection_manager_window import ConnectionManagerWindow
+        from ui.connection_manager_window import ConnectionManagerWindow
 
         dlg = ConnectionManagerWindow(self)
         dlg.connection_selected.connect(self.connect_to_database)

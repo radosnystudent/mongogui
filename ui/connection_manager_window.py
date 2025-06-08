@@ -16,8 +16,8 @@ from PyQt5.QtWidgets import (
     QWidget,  # Add QWidget for type annotation
 )
 
-from core.connection_manager import ConnectionManager
-from gui.connection_dialog import ConnectionDialog
+from db.connection_manager import ConnectionManager
+from ui.connection_dialog import ConnectionDialog
 
 NO_CONN_MSG = "No connection selected."
 TO_URI_LABEL = "To URI"

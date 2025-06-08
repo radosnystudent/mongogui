@@ -13,8 +13,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from gui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
-from gui.edit_document_dialog import EditDocumentDialog
+from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
+from ui.edit_document_dialog import EditDocumentDialog
 
 
 class QueryPanelMixin:

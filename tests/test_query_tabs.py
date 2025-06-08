@@ -3,7 +3,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pytestqt.qtbot import QtBot  # type: ignore[import-untyped]
 
-from gui.main_window import MainWindow
+from ui.main_window import MainWindow
 
 
 def test_query_tab_state_preserved(qtbot: "QtBot") -> None:
