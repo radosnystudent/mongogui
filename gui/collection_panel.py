@@ -362,6 +362,18 @@ class CollectionPanelMixin:
     def on_collection_tree_item_clicked(
         self, item: QTreeWidgetItem, column: int
     ) -> None:
+        # If MainWindow overrides this, call its version
+        from PyQt5.QtWidgets import QApplication
+
+        main_window = QApplication.activeWindow()
+        if (
+            main_window
+            and hasattr(main_window, "add_query_tab")
+            and hasattr(main_window, "on_collection_tree_item_clicked")
+            and main_window.__class__.__name__ == "MainWindow"
+        ):
+            main_window.on_collection_tree_item_clicked(item, column)
+            return None
         data = item.data(0, int(Qt.ItemDataRole.UserRole))
         if data and data.get("type") == "collection":
             collection_name = data["name"]
@@ -369,10 +381,8 @@ class CollectionPanelMixin:
             db_label = parent.text(0) if parent is not None else ""
             if hasattr(self, "query_input"):
                 self.query_input.setPlainText(f"db.{collection_name}.find({{}})")
-            # Store for query execution
             self.last_collection = collection_name
             self.last_db_label = db_label
-            # Set mongo_client for QueryPanelMixin/Explain
             active_clients = getattr(self, "active_clients", None)
             if isinstance(active_clients, dict) and db_label in active_clients:
                 self.mongo_client = active_clients[db_label]
