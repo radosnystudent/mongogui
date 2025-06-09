@@ -52,22 +52,21 @@ class MongoClientWrapper:
             return []
 
     def execute_query(
-        self, query_text: str, explain: bool = False
+        self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
-        """Execute a MongoDB query from text and return results. If explain is True, return the query plan."""
+        """Execute a MongoDB query from text and return results. Supports server-side pagination."""
         if self.client is None:
             return NOT_CONNECTED_MSG
 
         try:
-            # Preprocess the query to support user-friendly syntax
             preprocessed_query = query_preprocessor.preprocess_query(query_text)
-
-            # Simple query parsing - this is a basic implementation
             if "find(" in preprocessed_query:
-                return self._execute_find_query(preprocessed_query, explain=explain)
+                return self._execute_find_query(
+                    preprocessed_query, page=page, page_size=page_size, explain=explain
+                )
             elif "aggregate(" in preprocessed_query:
                 return self._execute_aggregate_query(
-                    preprocessed_query, explain=explain
+                    preprocessed_query, page=page, page_size=page_size, explain=explain
                 )
             else:
                 return "Unsupported query type"
@@ -75,9 +74,9 @@ class MongoClientWrapper:
             return f"Query execution error: {str(e)}"
 
     def _execute_find_query(
-        self, query_text: str, explain: bool = False
+        self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
-        """Execute a find query. If explain is True, return the query plan."""
+        """Execute a find query with server-side pagination."""
         try:
             import re
 
@@ -96,11 +95,14 @@ class MongoClientWrapper:
             if self.client is not None:
                 db = self.client[self.current_db]
                 collection = db[collection_name]
+                cursor = (
+                    collection.find(query_dict).skip(page * page_size).limit(page_size)
+                )
                 if explain:
-                    plan = collection.find(query_dict).limit(1000).explain()
+                    plan = cursor.explain()
                     return plan
                 else:
-                    results = list(collection.find(query_dict).limit(1000))
+                    results = list(cursor)
                     return results
             else:
                 return NOT_CONNECTED_MSG
@@ -108,9 +110,9 @@ class MongoClientWrapper:
             return f"Find query error: {str(e)}"
 
     def _execute_aggregate_query(
-        self, query_text: str, explain: bool = False
+        self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
-        """Execute an aggregate query. If explain is True, return the query plan."""
+        """Execute an aggregate query with server-side pagination."""
         try:
             import re
 
@@ -126,19 +128,22 @@ class MongoClientWrapper:
             if self.client is not None:
                 db = self.client[self.current_db]
                 collection = db[collection_name]
+                # Add $skip and $limit for pagination if not present
+                paginated_pipeline = list(pipeline)
+                paginated_pipeline.append({"$skip": page * page_size})
+                paginated_pipeline.append({"$limit": page_size})
                 if explain:
-                    # Use the database command for aggregation explain
                     plan = db.command(
                         "explain",
                         {
                             "aggregate": collection_name,
-                            "pipeline": pipeline,
-                            "cursor": {"batchSize": 1000},
+                            "pipeline": paginated_pipeline,
+                            "cursor": {"batchSize": page_size},
                         },
                     )
                     return plan
                 else:
-                    results = list(collection.aggregate(pipeline))
+                    results = list(collection.aggregate(paginated_pipeline))
                     return results
             else:
                 return NOT_CONNECTED_MSG

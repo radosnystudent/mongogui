@@ -46,10 +46,14 @@ class QueryPanelMixin:
             self._set_db_info_label("Please enter a query")
             return
         try:
-            result = self.mongo_client.execute_query(query_text)
+            # Use server-side pagination
+            result = self.mongo_client.execute_query(
+                query_text,
+                page=self.current_page,
+                page_size=self.page_size,
+            )
             if isinstance(result, list):
                 self.results = result
-                self.current_page = 0
                 self.last_query = query_text
                 self.display_results()
             else:
@@ -76,20 +80,18 @@ class QueryPanelMixin:
             if getattr(self, "json_tree", None):
                 self.json_tree.clear()
                 self.json_tree.hide()
+            self.page_label.setText(f"Page {self.current_page + 1}")
+            self.result_count_label.setText("No results")
+            self.prev_btn.setEnabled(self.current_page > 0)
+            self.next_btn.setEnabled(False)
             return
 
-        # Calculate pagination
-        start_idx = self.current_page * self.page_size
-        end_idx = min(start_idx + self.page_size, len(self.results))
-        page_results = self.results[start_idx:end_idx]
-
-        # Update UI controls
+        # Show all results for this page (already paginated)
+        page_results = self.results
         self.prev_btn.setEnabled(self.current_page > 0)
-        self.next_btn.setEnabled(end_idx < len(self.results))
+        self.next_btn.setEnabled(len(page_results) == self.page_size)
         self.page_label.setText(f"Page {self.current_page + 1}")
-        self.result_count_label.setText(
-            f"Showing {start_idx + 1}-{end_idx} of {len(self.results)} results"
-        )
+        self.result_count_label.setText(f"Showing {len(page_results)} results")
 
         # Display results in both table and tree view
         self.display_table_results(page_results)
@@ -98,7 +100,9 @@ class QueryPanelMixin:
         # Update JSON tree view
         if getattr(self, "json_tree", None):
             self.json_tree.clear()
-            for idx, doc in enumerate(page_results, start=start_idx + 1):
+            for idx, doc in enumerate(
+                page_results, start=self.current_page * self.page_size + 1
+            ):
                 doc_item = self._add_tree_item(f"Document {idx}", doc)
                 self.json_tree.addTopLevelItem(doc_item)
             self.json_tree.expandToDepth(1)
@@ -304,12 +308,11 @@ class QueryPanelMixin:
     def previous_page(self) -> None:
         if self.current_page > 0:
             self.current_page -= 1
-            self.display_results()
+            self.execute_query()
 
     def next_page(self) -> None:
-        if (self.current_page + 1) * self.page_size < len(self.results):
-            self.current_page += 1
-            self.display_results()
+        self.current_page += 1
+        self.execute_query()
 
     def execute_explain(self) -> None:
         """Run the current query with explain and display the plan."""
