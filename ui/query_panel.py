@@ -7,14 +7,15 @@ from PyQt5.QtWidgets import (
     QDialog,
     QMenu,
     QMessageBox,
+    QSplitter,  # Added QSplitter
     QTableWidgetItem,
     QTextEdit,
     QTreeWidgetItem,
     QWidget,
 )
 
-from gui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
-from gui.edit_document_dialog import EditDocumentDialog
+from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
+from ui.edit_document_dialog import EditDocumentDialog
 
 
 class QueryPanelMixin:
@@ -62,7 +63,13 @@ class QueryPanelMixin:
             label.setText(text)
 
     def display_results(self) -> None:
-        self.setup_query_panel_signals()  # Ensure context menus are always connected
+        # Reset UI state properly for query results
+        self._reset_ui_for_query_results()
+
+        # Connect signals for context menus
+        self.setup_query_panel_signals()
+
+        # Handle empty results case
         if not self.results:
             if self.data_table:
                 self.data_table.setRowCount(0)
@@ -70,17 +77,25 @@ class QueryPanelMixin:
                 self.json_tree.clear()
                 self.json_tree.hide()
             return
+
+        # Calculate pagination
         start_idx = self.current_page * self.page_size
         end_idx = min(start_idx + self.page_size, len(self.results))
         page_results = self.results[start_idx:end_idx]
+
+        # Update UI controls
         self.prev_btn.setEnabled(self.current_page > 0)
         self.next_btn.setEnabled(end_idx < len(self.results))
         self.page_label.setText(f"Page {self.current_page + 1}")
         self.result_count_label.setText(
             f"Showing {start_idx + 1}-{end_idx} of {len(self.results)} results"
         )
+
+        # Display results in both table and tree view
         self.display_table_results(page_results)
-        # Show JSON tree view
+        self.display_tree_results(page_results)
+
+        # Update JSON tree view
         if getattr(self, "json_tree", None):
             self.json_tree.clear()
             for idx, doc in enumerate(page_results, start=start_idx + 1):
@@ -88,7 +103,10 @@ class QueryPanelMixin:
                 self.json_tree.addTopLevelItem(doc_item)
             self.json_tree.expandToDepth(1)
             self.json_tree.show()
-        self.result_display.hide()
+
+        # Hide result_display (used for testing)
+        if hasattr(self, "result_display") and self.result_display is not None:
+            self.result_display.hide()
 
     def _add_tree_item(self, key: str, value: Any) -> QTreeWidgetItem:
         if isinstance(value, dict):
@@ -313,9 +331,17 @@ class QueryPanelMixin:
         if not self.json_tree:
             return
 
+        # Clean up any previous state first
+        self._remove_previous_summary_widget()
+
+        # Always hide the data table in explain mode
+        if hasattr(self, "data_table") and self.data_table is not None:
+            self.data_table.hide()
+            self.data_table.setVisible(False)  # Ensure it's really hidden
+
+        # Set up the explain view
         self._setup_explain_tree_view()
         self._hide_other_result_displays()
-        self._remove_previous_summary_widget()
         self._create_summary_widget(result)
         self._display_explain_tree(result)
 
@@ -340,40 +366,73 @@ class QueryPanelMixin:
     def _remove_previous_summary_widget(self) -> None:
         """Remove any existing summary widget."""
         if hasattr(self, "_explain_summary_widget") and self._explain_summary_widget:
-            parent_layout = (
-                self.json_tree.parentWidget().layout()
-                if self.json_tree.parentWidget()
-                else None
-            )
-            if parent_layout:
-                parent_layout.removeWidget(self._explain_summary_widget)
-            self._explain_summary_widget.deleteLater()
-            self._explain_summary_widget = None
+            widget_to_remove = self._explain_summary_widget
+            self._explain_summary_widget = None  # Clear the reference immediately
+
+            original_parent = widget_to_remove.parentWidget()
+
+            widget_to_remove.hide()
+            # Setting parent to None should remove it from the original_parent's (e.g., QSplitter) list of children
+            widget_to_remove.setParent(None)
+            widget_to_remove.deleteLater()  # Schedule for deletion
+
+            if isinstance(original_parent, QSplitter):
+                original_parent.refresh()  # Crucial for QSplitter to update its internal state
+                # Force visual updates on the splitter
+                original_parent.updateGeometry()
+                original_parent.update()
+                if hasattr(
+                    original_parent, "repaint"
+                ):  # Should always be true for QWidget
+                    original_parent.repaint()
+
+            # Ensure data_table is made visible as we are removing the explain summary
+            if hasattr(self, "data_table") and self.data_table is not None:
+                self.data_table.setVisible(True)
+                self.data_table.show()
+                if hasattr(self.data_table, "raise_"):
+                    self.data_table.raise_()
 
     def _create_summary_widget(self, result: Any) -> None:
         """Create and display the query summary widget."""
-        from PyQt5.QtWidgets import QLabel, QVBoxLayout, QWidget
+        from PyQt5.QtWidgets import (  # QSplitter already imported at module level
+            QLabel,
+            QVBoxLayout,
+            QWidget,
+        )
 
         summary_text = self._build_explain_summary(result)
         if not summary_text:
             return
 
-        summary_widget = QWidget(self.json_tree.parentWidget())
-        summary_layout = QVBoxLayout(summary_widget)
+        # The parent of json_tree is the QSplitter in QueryTabWidget
+        splitter_widget = self.json_tree.parentWidget()
+        if not splitter_widget:  # Should ideally not happen
+            # Log or handle error: cannot create summary widget without a parent splitter
+            return
+
+        # Create the summary widget, parented to the splitter.
+        # QSplitter.insertWidget will manage it.
+        summary_widget_instance = QWidget(splitter_widget)
+        summary_layout = QVBoxLayout(summary_widget_instance)
         summary_label = QLabel(f"<b>Query Summary</b><br>{summary_text}")
         summary_label.setWordWrap(True)
         summary_layout.addWidget(summary_label)
         summary_layout.setContentsMargins(8, 8, 8, 8)
-        summary_widget.setLayout(summary_layout)
+        summary_widget_instance.setLayout(summary_layout)
 
-        parent_layout = (
-            self.json_tree.parentWidget().layout()
-            if self.json_tree.parentWidget()
-            else None
-        )
-        if parent_layout:
-            parent_layout.insertWidget(0, summary_widget)
-        self._explain_summary_widget = summary_widget
+        if isinstance(splitter_widget, QSplitter):
+            # Insert the summary widget at the top of the splitter
+            splitter_widget.insertWidget(0, summary_widget_instance)
+        else:
+            # Fallback: if parent is not a QSplitter, try to use its layout.
+            # This is less ideal and indicates a potential structure mismatch.
+            parent_layout = splitter_widget.layout()
+            if parent_layout:
+                parent_layout.insertWidget(0, summary_widget_instance)
+
+        summary_widget_instance.show()  # Ensure the newly added widget is visible
+        self._explain_summary_widget = summary_widget_instance
 
     def _display_explain_tree(self, result: Any) -> None:
         """Display the explain result in the tree view."""
@@ -540,3 +599,23 @@ class QueryPanelMixin:
         else:
             child = QTreeWidgetItem([str(key), str(value)])
             parent.addChild(child)
+
+    def _reset_ui_for_query_results(self) -> None:
+        """Reset the UI state before displaying query results."""
+        # First, remove any previous summary widget. This now also handles splitter refresh.
+        self._remove_previous_summary_widget()
+
+        # Make sure data_table is visible and brought to front
+        if hasattr(self, "data_table") and self.data_table is not None:
+            self.data_table.setVisible(True)
+            self.data_table.show()
+            if hasattr(self.data_table, "raise_"):
+                self.data_table.raise_()
+
+        # Reset json_tree for display: clear and hide it.
+        # display_results will .show() it later if there's data.
+        if hasattr(self, "json_tree") and self.json_tree is not None:
+            self.json_tree.clear()
+            self.json_tree.hide()  # Explicitly hide
+
+        # Redundant parent updates removed as _remove_previous_summary_widget now handles splitter updates.

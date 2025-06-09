@@ -2,8 +2,8 @@ import sys
 
 from PyQt5.QtWidgets import QApplication
 
-from gui.connection_manager_window import ConnectionManagerWindow
-from gui.main_window import MainWindow
+from ui.connection_manager_window import ConnectionManagerWindow
+from ui.main_window import MainWindow
 
 
 class App:

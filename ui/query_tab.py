@@ -14,8 +14,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from gui.query_panel import QueryPanelMixin
-from gui.ui_utils import set_minimum_heights
+from ui.query_panel import QueryPanelMixin
+from ui.ui_utils import set_minimum_heights
 
 
 class QueryTabWidget(QWidget, QueryPanelMixin):
@@ -104,11 +104,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         self.setup_query_panel_signals()
         results_splitter.setSizes([400, 200])
         layout.addWidget(results_splitter, stretch=1)
-        # Add hidden result_display for test compatibility
-        self.result_display = QTextEdit()
-        self.result_display.setObjectName("result_display")
-        self.result_display.setVisible(False)
-        layout.addWidget(self.result_display)
         set_minimum_heights(self)
         self.setLayout(layout)
 
@@ -132,9 +127,9 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
     # ...existing code for QueryPanelMixin methods...
 
     def display_results(self) -> None:
+        self._reset_ui_for_query_results()
         self.setup_query_panel_signals()
         if not self.results:
-            self.result_display.setPlainText("No results")
             if self.data_table:
                 self.data_table.setRowCount(0)
             if getattr(self, "json_tree", None):
@@ -152,24 +147,3 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         )
         self.display_table_results(page_results)
         self.display_tree_results(page_results)
-
-        # For test compatibility, show all documents as text in result_display
-        def bson_dumps(doc: Any, indent: int = 2) -> str:
-            try:
-                from bson.json_util import dumps as _bson_dumps
-
-                return _bson_dumps(doc, indent=indent)
-            except ImportError:
-                return ""
-
-        if page_results:
-            dumped_docs = [bson_dumps(doc) for doc in page_results]
-            self.result_display.setPlainText(
-                "\n".join(s for s in dumped_docs if isinstance(s, str) and s)
-            )
-
-    def _set_db_info_label(self, text: str) -> None:
-        # Update result_display for test compatibility
-        if hasattr(self, "result_display") and self.result_display is not None:
-            self.result_display.setPlainText(text)
-        # Optionally update a visible label if needed

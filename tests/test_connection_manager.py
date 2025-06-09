@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
 
-from core.connection_manager import ConnectionManager
+from db.connection_manager import ConnectionManager
 
 
 class TestConnectionManager(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestConnectionManager(unittest.TestCase):
         ConnectionManager(storage_path=new_temp_dir)
         self.assertTrue(os.path.exists(new_temp_dir))
 
-    @patch("core.connection_manager.keyring")
+    @patch("db.connection_manager.keyring")
     def test_add_connection_saves_data_and_credentials(
         self, mock_keyring: MagicMock
     ) -> None:
@@ -62,7 +62,7 @@ class TestConnectionManager(unittest.TestCase):
             self.connection_manager.keyring_service, f"{name}_password", password
         )
 
-    @patch("core.connection_manager.keyring")
+    @patch("db.connection_manager.keyring")
     def test_add_connection_without_credentials(self, mock_keyring: MagicMock) -> None:
         """Test that add_connection works without login credentials."""
         name = "test_connection_no_auth"
@@ -123,7 +123,7 @@ class TestConnectionManager(unittest.TestCase):
         connections = self.connection_manager.get_connections()
         self.assertEqual(connections, [])
 
-    @patch("core.connection_manager.keyring")
+    @patch("db.connection_manager.keyring")
     def test_get_connection_by_name_success(self, mock_keyring: MagicMock) -> None:
         """Test get_connection_by_name returns connection with credentials."""
         # Setup mock keyring
@@ -162,7 +162,7 @@ class TestConnectionManager(unittest.TestCase):
         connection = self.connection_manager.get_connection_by_name("non_existent")
         self.assertIsNone(connection)
 
-    @patch("core.connection_manager.keyring")
+    @patch("db.connection_manager.keyring")
     def test_get_connection_by_name_missing_credentials(
         self, mock_keyring: MagicMock
     ) -> None:

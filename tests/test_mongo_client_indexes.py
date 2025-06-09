@@ -4,7 +4,7 @@ import typing
 
 import pytest
 
-from core.mongo_client import MongoClientWrapper
+from db.mongo_client import MongoClientWrapper
 
 
 def random_collection_name() -> str:

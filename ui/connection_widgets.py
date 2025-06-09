@@ -11,9 +11,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from core.mongo_client import MongoClientWrapper
-from gui.collection_panel import CollectionPanelMixin
-from gui.connection_dialog import ConnectionDialog
+from db.mongo_client import MongoClientWrapper
+from ui.collection_panel import CollectionPanelMixin
+from ui.connection_dialog import ConnectionDialog
 
 CONNECTION_ERROR_TITLE = "Connection Error"
 

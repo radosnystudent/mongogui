@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from core.mongo_client import MongoClientWrapper
+from db.mongo_client import MongoClientWrapper
 
 
 class TestMongoClientWrapper:
@@ -14,7 +14,7 @@ class TestMongoClientWrapper:
         """Create a MongoClientWrapper instance for testing."""
         return MongoClientWrapper()
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_connect_success_with_auth(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -34,7 +34,7 @@ class TestMongoClientWrapper:
         mock_mongo_client.assert_called_once()
         mock_client_instance.admin.command.assert_called_once_with("ping")
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_connect_success_without_auth(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -51,7 +51,7 @@ class TestMongoClientWrapper:
         assert result is True
         mock_mongo_client.assert_called_once()
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_connect_failure(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -67,7 +67,7 @@ class TestMongoClientWrapper:
         # Verify
         assert result is False
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_list_collections_success(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -95,7 +95,7 @@ class TestMongoClientWrapper:
         collections = mongo_wrapper.list_collections()
         assert collections == []
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_execute_find_query(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -128,7 +128,7 @@ class TestMongoClientWrapper:
         result = mongo_wrapper.execute_query("db.test.find({})")
         assert result == "Not connected to database"
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_run_query_success(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -159,7 +159,7 @@ class TestMongoClientWrapper:
         result = mongo_wrapper.run_query("test_db", "test_collection", {})
         assert result == "Not connected to database"
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_run_aggregate_success(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -192,7 +192,7 @@ class TestMongoClientWrapper:
         result = mongo_wrapper.run_aggregate("test_db", "test_collection", pipeline)
         assert result == "Not connected to database"
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_execute_invalid_query(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
@@ -210,7 +210,7 @@ class TestMongoClientWrapper:
         assert isinstance(result, str)
         assert "Unsupported query type" in result
 
-    @patch("core.mongo_client.MongoClient")
+    @patch("db.mongo_client.MongoClient")
     def test_execute_aggregate_query(
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:

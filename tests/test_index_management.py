@@ -6,7 +6,7 @@ from typing import cast
 import pytest
 from PyQt5.QtWidgets import QApplication
 
-from gui.index_dialog import IndexDialog, IndexEditDialog
+from ui.index_dialog import IndexDialog, IndexEditDialog
 
 
 @pytest.fixture(scope="module")

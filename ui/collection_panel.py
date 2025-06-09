@@ -11,7 +11,7 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from gui.index_dialog import IndexDialog
+from ui.index_dialog import IndexDialog
 
 if TYPE_CHECKING:
     from PyQt5.QtWidgets import QTextEdit, QVBoxLayout
@@ -124,14 +124,7 @@ class CollectionPanelMixin:
                 item.takeChildren()
                 mongo_client = self._get_mongo_client_for_item(item)
                 if mongo_client is not None:
-                    self._load_collection_indexes(item, data, mongo_client)
                     self.reload_collection_indexes_in_tree(item)
-
-    def _load_collection_indexes(
-        self, item: QTreeWidgetItem, data: dict, mongo_client: Any = None
-    ) -> None:
-        # This method is now handled by reload_collection_indexes_in_tree for UI updates
-        pass
 
     def reload_collection_indexes_in_tree(
         self, col_item: QTreeWidgetItem | None
@@ -283,7 +276,7 @@ class CollectionPanelMixin:
         return {k: v for k, v in data.items() if k not in ("key", "name")}
 
     def show_edit_index_dialog(self, collection_name: str, index_dict: dict) -> None:
-        from gui.index_dialog import IndexEditDialog
+        from ui.index_dialog import IndexEditDialog
 
         dlg = IndexEditDialog(index_dict, self.collection_tree)
         if dlg.exec_() == QDialog.Accepted:

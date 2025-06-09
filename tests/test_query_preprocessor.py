@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from core.query_preprocessor import QueryPreprocessor
+from db.query_preprocessor import QueryPreprocessor
 
 
 class TestQueryPreprocessor:

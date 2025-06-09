@@ -9,7 +9,7 @@ import sys
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from core.mongo_client import MongoClientWrapper
+from db.mongo_client import MongoClientWrapper
 
 
 def test_mongo_client_integration() -> None:
