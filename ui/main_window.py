@@ -69,9 +69,7 @@ class MainWindow(
 
         from PyQt5.QtWidgets import QVBoxLayout
 
-        self.connection_layout = (
-            QVBoxLayout()
-        )
+        self.connection_layout = QVBoxLayout()
 
         self.setup_ui()
         self.load_connections()
