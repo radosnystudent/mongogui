@@ -47,6 +47,7 @@ class MainWindow(
         super().__init__()
         self.setWindowTitle("MongoDB GUI")
         self.setGeometry(100, 100, 1200, 800)
+        self.showMaximized()  # Start in fullscreen mode
 
         # Instantiate ConnectionManager
         self.conn_manager = ConnectionManager()

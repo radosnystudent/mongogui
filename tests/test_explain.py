@@ -12,9 +12,10 @@ def test_explain_find_query(mock_mongo_client: MagicMock) -> None:
     mock_client_instance.__getitem__.return_value = mock_db
     mock_db.__getitem__.return_value = mock_collection
     mock_cursor = MagicMock()
-    mock_cursor.limit.return_value.explain.return_value = {
-        "queryPlanner": {"indexFilterSet": False}
-    }
+    # Patch skip and limit chain for server-side pagination
+    mock_cursor.skip.return_value = mock_cursor
+    mock_cursor.limit.return_value = mock_cursor
+    mock_cursor.explain.return_value = {"queryPlanner": {"indexFilterSet": False}}
     mock_collection.find.return_value = mock_cursor
     wrapper = MongoClientWrapper()
     wrapper.client = mock_client_instance
