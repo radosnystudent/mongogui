@@ -1,4 +1,3 @@
-import json
 from collections.abc import Callable
 from typing import Any
 
@@ -13,7 +12,6 @@ from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
-    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
     QVBoxLayout,
@@ -69,21 +67,6 @@ class MainWindow(
         self.query_tabs.tabCloseRequested.connect(self._close_query_tab)
         self.query_tabs.setMovable(True)
 
-        # Hidden result display for test compatibility
-        self.result_display = QTextEdit()
-        self.result_display.setObjectName("result_display")
-        self.result_display.setVisible(False)
-
-        # Remove old connections box and add connection button
-        # Only keep the 'Connections' button to open the manager
-        # Remove self.connection_scroll, self.connection_widget, self.connection_layout, add_conn_btn
-        # Provide a dummy connection_layout for compatibility with legacy code/tests
-        from PyQt5.QtWidgets import QVBoxLayout
-
-        self.connection_layout = (
-            QVBoxLayout()
-        )  # Not used, but prevents AttributeError in tests
-
         self.setup_ui()
         self.load_connections()
 
@@ -98,11 +81,6 @@ class MainWindow(
         left_panel = QWidget()
         left_panel.setFixedWidth(300)
         left_layout = QVBoxLayout(left_panel)
-
-        # Connection controls
-        # Remove 'Connections:' label and db_info_label
-        # left_layout.addWidget(connection_label)
-        # left_layout.addWidget(self.db_info_label)
 
         # Add 'Connections' button to open the connection manager window
         open_conn_mgr_btn = QPushButton("Connections")
@@ -128,9 +106,6 @@ class MainWindow(
 
         right_panel.setLayout(right_layout)
         main_layout.addWidget(right_panel, stretch=1)
-
-        # Add initial tab only if a connection is active (or for testing)
-        # self.add_query_tab() # Removed initial tab creation here
 
     def add_query_tab(
         self, collection_name: str | None = None, db_label: str | None = None
@@ -188,9 +163,6 @@ class MainWindow(
         if widget:
             self.query_tabs.removeTab(index)
             widget.deleteLater()
-        # Do not automatically add a new tab if the last one is closed.
-        # if self.query_tabs.count() == 0:
-        # self.add_query_tab() # Removed auto-add
 
     def _close_query_tab_by_widget(self, widget: QWidget) -> None:
         index = self.query_tabs.indexOf(widget)
@@ -303,7 +275,6 @@ class MainWindow(
             # current_tab.display_results() # QueryTabWidget.display_results will be called by its own execute_query
             pass  # Results are displayed within the tab itself.
         elif not self.results:  # Fallback for old direct execution path (if any)
-            self.result_display.setPlainText("No results")
             if self.data_table:
                 self.data_table.setRowCount(0)
             return
@@ -326,17 +297,6 @@ class MainWindow(
 
         # Display in tree format
         self.display_tree_results(page_results)
-
-        # For test compatibility, show all documents as text in result_display
-        if page_results:
-            if bson_dumps is not None:
-                self.result_display.setPlainText(
-                    "\n".join(bson_dumps(doc, indent=2) for doc in page_results)
-                )
-            else:
-                self.result_display.setPlainText(
-                    "\n".join(json.dumps(doc) for doc in page_results)
-                )
 
     def display_table_results(self, results: list[dict[str, Any]]) -> None:
         if not results or not self.data_table:
@@ -459,18 +419,3 @@ class MainWindow(
         dlg.exec_()
         # Optionally: reload connections if changed
         self.load_connections()
-
-    def load_collections(self, mongo_client: "Any | None" = None) -> None:
-        # Compatibility for tests: if no mongo_client, use a dummy or the first active client
-        # If active_clients is set, always use it for test compatibility
-        if hasattr(self, "active_clients") and self.active_clients:
-            for db_label, client in self.active_clients.items():
-                self.add_database_collections(db_label, client)
-            return
-        if mongo_client is None:
-            # Fallback: create a dummy client if needed for tests
-            from unittest.mock import MagicMock
-
-            mongo_client = MagicMock()
-            mongo_client.list_collections.return_value = ["col1"]
-        self.add_database_collections("testdb", mongo_client)

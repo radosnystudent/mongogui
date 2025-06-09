@@ -124,14 +124,7 @@ class CollectionPanelMixin:
                 item.takeChildren()
                 mongo_client = self._get_mongo_client_for_item(item)
                 if mongo_client is not None:
-                    self._load_collection_indexes(item, data, mongo_client)
                     self.reload_collection_indexes_in_tree(item)
-
-    def _load_collection_indexes(
-        self, item: QTreeWidgetItem, data: dict, mongo_client: Any = None
-    ) -> None:
-        # This method is now handled by reload_collection_indexes_in_tree for UI updates
-        pass
 
     def reload_collection_indexes_in_tree(
         self, col_item: QTreeWidgetItem | None
