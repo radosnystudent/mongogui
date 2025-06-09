@@ -67,6 +67,12 @@ class MainWindow(
         self.query_tabs.tabCloseRequested.connect(self._close_query_tab)
         self.query_tabs.setMovable(True)
 
+        from PyQt5.QtWidgets import QVBoxLayout
+
+        self.connection_layout = (
+            QVBoxLayout()
+        )
+
         self.setup_ui()
         self.load_connections()
 
