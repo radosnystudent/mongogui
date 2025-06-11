@@ -1,5 +1,7 @@
+import re
 from collections.abc import Callable
 from typing import Any
+from utils.error_handling import handle_exception
 
 from PyQt5.QtCore import QEvent, QObject, Qt
 from PyQt5.QtGui import QKeyEvent
@@ -219,8 +221,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
             else:
                 self._set_db_info_label(f"Error: {result.unwrap_err()}")
         except Exception as e:
-            from utils.error_handling import handle_exception
-
             handle_exception(
                 e, parent=getattr(self, "parent", None), title="Query Error"
             )
@@ -311,7 +311,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         cursor = self.query_input.textCursor()
         pos = cursor.position()
         before = text[:pos]
-        import re
 
         # Try to find the last field path before the cursor, e.g. {"documents. or {documents.documentId.
         m = re.search(r"\{[^{}]*?([\w\.]+\.)?$", before)
@@ -332,8 +331,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         collection = self.collection_name or self.last_collection
         # If collection is not set, try to extract from query input
         if not collection:
-            import re
-
             text = self.query_input.toPlainText()
             m = re.search(r"db\.(\w+)\.find", text)
             if m:

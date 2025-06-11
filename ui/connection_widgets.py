@@ -1,4 +1,5 @@
 from typing import TYPE_CHECKING, Any
+from PyQt5.QtWidgets import QTextEdit
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 class ConnectionWidgetsMixin(CollectionPanelMixin):
     connection_layout: "QVBoxLayout"
     conn_manager: Any
-    result_display: "QTextEdit"
+    result_display: QTextEdit | None
     mongo_client: Any
     query_input: Any
     data_table: Any

@@ -4,6 +4,7 @@ Syntax highlighter for JSON used in the MongoDB GUI application.
 Provides color highlighting for JSON keys, values, punctuation, numbers, booleans, nulls, and braces.
 """
 
+import re
 from PyQt5.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat, QTextDocument
 
 
@@ -38,8 +39,6 @@ class JsonHighlighter(QSyntaxHighlighter):
         self.brace_format.setForeground(QColor("#000000"))
 
         # Pre-compile regular expressions
-        import re
-
         self.key_regex = re.compile(r'"(\\.|[^"\\])*"(?=\s*:)')
         self.punct_regex = re.compile(r"[:,]")
         self.value_regex = re.compile(r'(?<=:)\s*"(\\.|[^"\\])*"')

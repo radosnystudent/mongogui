@@ -1,5 +1,6 @@
 import json
 import os
+import shutil
 import tempfile
 import unittest
 from unittest.mock import MagicMock, patch
@@ -16,8 +17,6 @@ class TestConnectionManager(unittest.TestCase):
     def tearDown(self) -> None:
         """Clean up after each test method."""
         # Clean up temp directory
-        import shutil
-
         shutil.rmtree(self.temp_dir)
 
     def test_init_creates_storage_directory(self) -> None:

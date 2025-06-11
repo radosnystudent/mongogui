@@ -11,6 +11,7 @@ import platform
 import subprocess
 import sys
 from pathlib import Path
+import importlib.util
 
 
 def detect_platform() -> str:
@@ -110,8 +111,6 @@ def ensure_dependencies(pip_exe: Path) -> None:
     """Ensure all dependencies are installed."""
     print("Checking dependencies...")
     try:
-        import importlib.util
-
         for pkg in ["keyring", "pymongo", "PyQt5"]:
             if importlib.util.find_spec(pkg) is None:
                 raise ImportError(f"{pkg} not found")

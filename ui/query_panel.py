@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -15,6 +16,7 @@ from PyQt5.QtWidgets import (
     QTreeWidgetItem,
     QWidget,
 )
+from PyQt5.QtWidgets import QHeaderView, QLabel, QVBoxLayout
 
 from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE, SCHEMA_DIR
 from ui.edit_document_dialog import EditDocumentDialog
@@ -397,8 +399,6 @@ class QueryPanelMixin:
 
     def _setup_explain_tree_view(self) -> None:
         """Set up the tree view for explain results."""
-        from PyQt5.QtWidgets import QHeaderView
-
         self.json_tree.clear()
         self.json_tree.show()
         self.json_tree.header().setSectionResizeMode(0, QHeaderView.Interactive)
@@ -445,12 +445,6 @@ class QueryPanelMixin:
 
     def _create_summary_widget(self, result: Any) -> None:
         """Create and display the query summary widget."""
-        from PyQt5.QtWidgets import (
-            QLabel,
-            QVBoxLayout,
-            QWidget,
-        )
-
         summary_text = self._build_explain_summary(result)
         if not summary_text:
             summary_text = "<i>No summary available for this query plan.</i>"
@@ -687,8 +681,6 @@ class QueryPanelMixin:
     ) -> list[str]:
         """Return field suggestions based on schema and current query context."""
         # Simple parser: look for db.collection.find({"field1.field2.")
-        import re
-
         m = re.search(rf"db\\.{collection}\\.find\\(\{{.*?([\w\.]+)\\.$", text)
         if not m:
             return []

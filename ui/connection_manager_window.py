@@ -1,3 +1,6 @@
+import datetime
+import json
+import os
 from typing import Any
 
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -103,7 +106,6 @@ class ConnectionManagerWindow(QDialog):
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
-                import datetime
 
                 now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
                 # Save extra fields manually after add_connection
@@ -111,9 +113,6 @@ class ConnectionManagerWindow(QDialog):
                     name, db, ip, int(port), login, password, tls
                 )
                 # Patch file to add last_connected/last_modified
-                import json
-                import os
-
                 path = os.path.join(self.conn_manager.storage_path, f"{name}.json")
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
@@ -149,16 +148,12 @@ class ConnectionManagerWindow(QDialog):
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
-                import datetime
 
                 now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
                 self.conn_manager.update_connection(
                     conn["name"], db, ip, int(port), login, password, tls, new_name=name
                 )
                 # Patch file to update last_modified
-                import json
-                import os
-
                 path = os.path.join(self.conn_manager.storage_path, f"{name}.json")
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
@@ -208,15 +203,10 @@ class ConnectionManagerWindow(QDialog):
     def connect_selected(self, *args: Any) -> None:
         conn = self.get_selected_connection()
         if conn:
-            import datetime
-
             now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
             conn["last_connected"] = now
             conn["last_modified"] = now
             # Patch file to update last_connected/last_modified
-            import json
-            import os
-
             path = os.path.join(self.conn_manager.storage_path, f"{conn['name']}.json")
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
@@ -234,8 +224,6 @@ class ConnectionManagerWindow(QDialog):
         )
         if path:
             try:
-                import json
-
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 # Accept both a list of connections or a single connection
@@ -265,8 +253,6 @@ class ConnectionManagerWindow(QDialog):
         )
         if path:
             try:
-                import json
-
                 connections = self.conn_manager.get_connections()
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(connections, f, indent=2)

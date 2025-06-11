@@ -2,6 +2,7 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
+from pymongo.errors import PyMongoError
 
 from db.mongo_client import MongoClientWrapper
 
@@ -56,8 +57,6 @@ class TestMongoClientWrapper:
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
         """Test failed connection."""
-        from pymongo.errors import PyMongoError
-
         mock_mongo_client.side_effect = PyMongoError("Connection failed")
 
         # Test connection
