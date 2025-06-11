@@ -9,6 +9,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from ui.ui_utils import setup_dialog_layout
 
 
 class ConnectionDialog(QDialog):
@@ -32,27 +33,24 @@ class ConnectionDialog(QDialog):
         self.cancel_btn = QPushButton("Cancel")
         self.connection_result: tuple[str, str, str, str, str, str, bool] | None = None
 
-        layout = QVBoxLayout()
-        layout.addWidget(QLabel("Connection Name:"))
-        layout.addWidget(self.name_input)
-        layout.addWidget(QLabel("Database Name:"))
-        layout.addWidget(self.db_input)
-        layout.addWidget(QLabel("IP Address:"))
-        layout.addWidget(self.ip_input)
-        layout.addWidget(QLabel("Port:"))
-        layout.addWidget(self.port_input)
-        layout.addWidget(QLabel("Login:"))
-        layout.addWidget(self.login_input)
-        layout.addWidget(QLabel("Password:"))
-        layout.addWidget(self.password_input)
-        layout.addWidget(self.show_password_checkbox)
-        layout.addWidget(self.tls_checkbox)
-
-        btn_layout = QHBoxLayout()
-        btn_layout.addWidget(self.ok_btn)
-        btn_layout.addWidget(self.cancel_btn)
-        layout.addLayout(btn_layout)
-        self.setLayout(layout)
+        widgets = [
+            QLabel("Connection Name:"),
+            self.name_input,
+            QLabel("Database Name:"),
+            self.db_input,
+            QLabel("IP Address:"),
+            self.ip_input,
+            QLabel("Port:"),
+            self.port_input,
+            QLabel("Login:"),
+            self.login_input,
+            QLabel("Password:"),
+            self.password_input,
+            self.show_password_checkbox,
+            self.tls_checkbox,
+        ]
+        button_widgets: list[QWidget] = [self.ok_btn, self.cancel_btn]
+        setup_dialog_layout(self, widgets, button_widgets)
 
         self.ok_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)

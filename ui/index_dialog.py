@@ -2,6 +2,7 @@ import json
 from typing import Any
 
 from PyQt5.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QHBoxLayout,
@@ -11,9 +12,19 @@ from PyQt5.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
+    QTabWidget,
     QVBoxLayout,
-    QWidget,  # <-- add QWidget for type annotation
+    QWidget,
+    QTextEdit,
 )
+
+from ui.ui_utils import setup_dialog_layout
+
+ADD_INDEX_LABEL = "Add Index"
+EDIT_INDEX_LABEL = "Edit Index"
+REMOVE_INDEX_LABEL = "Remove Index"
+SAVE_LABEL = "Save"
+CANCEL_LABEL = "Cancel"
 
 INDEX_TYPE_ASC = "1 (asc)"
 INDEX_TYPE_DESC = "-1 (desc)"
@@ -38,7 +49,22 @@ class IndexDialog(QDialog):
         self.setMinimumSize(700, 400)
         self.indexes = indexes
         self.selected_index_name: str | None = None
-        self.init_ui()
+        self.table = QTableWidget(self)
+        self.table.setColumnCount(3)
+        self.table.setHorizontalHeaderLabels(["Name", "Keys", "Unique"])
+        self.table.setSelectionBehavior(self.table.SelectRows)
+        self.table.setEditTriggers(self.table.NoEditTriggers)
+        self.load_indexes()
+        self.add_btn = QPushButton(ADD_INDEX_LABEL)
+        self.edit_btn = QPushButton(EDIT_INDEX_LABEL)
+        self.remove_btn = QPushButton(REMOVE_INDEX_LABEL)
+        widgets: list[QWidget] = [self.table]
+        button_widgets: list[QWidget] = [self.add_btn, self.edit_btn, self.remove_btn]
+        setup_dialog_layout(self, widgets, button_widgets)
+        self.add_btn.clicked.connect(self.add_index_dialog)
+        self.edit_btn.clicked.connect(self.edit_index_dialog)
+        self.remove_btn.clicked.connect(self.remove_index)
+        self.table.cellClicked.connect(self.on_table_click)
 
     def init_ui(self) -> None:
         layout = QVBoxLayout(self)
@@ -51,9 +77,9 @@ class IndexDialog(QDialog):
         layout.addWidget(self.table)
 
         btn_layout = QHBoxLayout()
-        self.add_btn = QPushButton("Add Index")
-        self.edit_btn = QPushButton("Edit Index")
-        self.remove_btn = QPushButton("Remove Index")
+        self.add_btn = QPushButton(ADD_INDEX_LABEL)
+        self.edit_btn = QPushButton(EDIT_INDEX_LABEL)
+        self.remove_btn = QPushButton(REMOVE_INDEX_LABEL)
         btn_layout.addWidget(self.add_btn)
         btn_layout.addWidget(self.edit_btn)
         btn_layout.addWidget(self.remove_btn)
@@ -126,91 +152,40 @@ class IndexEditDialog(QDialog):
         self.setWindowTitle("Edit Index" if index else "Add Index")
         self.setMinimumSize(420, 400)  # Keep compact width
         self.index = index or {}
-        self.init_ui()
-
-    def init_ui(self, /) -> None:
-        layout = QVBoxLayout(self)
-        # Index name
-        layout.addWidget(QLabel("Index name:"))
         self.name_edit = QLineEdit(self)
         if self.index:
             self.name_edit.setText(self.index.get("name", ""))
-        layout.addWidget(self.name_edit)
-
-        # Tabs: Fields, Options
-        from PyQt5.QtWidgets import (
-            QCheckBox,
-            QHBoxLayout,
-            QPushButton,
-            QTableWidget,
-            QTabWidget,
-            QWidget,
-        )
-
         self.tabs = QTabWidget(self)
-        # --- Fields tab ---
         self.fields_tab = QWidget()
-        fields_layout = QVBoxLayout(self.fields_tab)
-        # Indexed fields table
         self.fields_table = QTableWidget(self.fields_tab)
         self.fields_table.setColumnCount(2)
         self.fields_table.setHorizontalHeaderLabels(["Field name", "Index type"])
         self.fields_table.setEditTriggers(QTableWidget.NoEditTriggers)
-        fields_layout.addWidget(self.fields_table)
-        # Add field controls
-        add_field_layout = QHBoxLayout()
         self.field_name_edit = QLineEdit(self.fields_tab)
         self.index_type_combo = QComboBox(self.fields_tab)
         self.index_type_combo.addItems(INDEX_TYPE_CHOICES)
-        add_field_layout.addWidget(self.field_name_edit)
-        add_field_layout.addWidget(self.index_type_combo)
         self.add_field_btn = QPushButton("Add field", self.fields_tab)
         self.remove_field_btn = QPushButton("Remove field", self.fields_tab)
+        fields_layout = QVBoxLayout(self.fields_tab)
+        add_field_layout = QHBoxLayout()
+        add_field_layout.addWidget(self.field_name_edit)
+        add_field_layout.addWidget(self.index_type_combo)
         add_field_layout.addWidget(self.add_field_btn)
         add_field_layout.addWidget(self.remove_field_btn)
+        fields_layout.addWidget(self.fields_table)
         fields_layout.addLayout(add_field_layout)
         self.tabs.addTab(self.fields_tab, "Fields")
-        # --- Options tab ---
         self.options_tab = QWidget()
         options_layout = QVBoxLayout(self.options_tab)
-        options_layout.setSpacing(16)  # Add more space between options
-        # Unique
         self.unique_checkbox = QCheckBox("Unique", self.options_tab)
         options_layout.addWidget(self.unique_checkbox)
-        options_layout.addWidget(
-            QLabel(
-                "Prevents the insertion of documents where the index key(s) match(es) an already existing value in the collection.\nOften combined with the sparse option.",
-                self.options_tab,
-            )
-        )
-        # Spacer
-        options_layout.addSpacing(8)
-        # Sparse
         self.sparse_checkbox = QCheckBox("Sparse", self.options_tab)
         options_layout.addWidget(self.sparse_checkbox)
-        options_layout.addWidget(
-            QLabel(
-                "Omit references to documents that don't include the indexed field.\nFor fields that are only present in some documents. They may provide significant space savings.",
-                self.options_tab,
-            )
-        )
-        options_layout.addSpacing(8)
-        # Hidden
         self.hidden_checkbox = QCheckBox("Hidden", self.options_tab)
         options_layout.addWidget(self.hidden_checkbox)
-        options_layout.addWidget(
-            QLabel(
-                "This index becomes invisible to the query planner and can't be used to support a query.\nAvailable only in MongoDB 4.4 servers and newer.",
-                self.options_tab,
-            )
-        )
-        options_layout.addSpacing(8)
-        # TTL
         self.ttl_checkbox = QCheckBox("TTL", self.options_tab)
         options_layout.addWidget(self.ttl_checkbox)
         ttl_row = QHBoxLayout()
-        ttl_row.setSpacing(4)
-        ttl_row.setContentsMargins(0, 0, 0, 0)
         ttl_row.addWidget(QLabel("Expire after", self.options_tab))
         self.ttl_seconds_edit = QLineEdit(self.options_tab)
         self.ttl_seconds_edit.setPlaceholderText("sec")
@@ -218,43 +193,21 @@ class IndexEditDialog(QDialog):
         ttl_row.addWidget(self.ttl_seconds_edit)
         ttl_row.addStretch(1)
         options_layout.addLayout(ttl_row)
-        options_layout.addWidget(
-            QLabel(
-                "A special type of index that MongoDB can use to automatically remove documents from a\ncollection after a certain amount of time. The indexed field must be a date type.",
-                self.options_tab,
-            )
-        )
-        options_layout.addSpacing(8)
-        # Partial
         self.partial_checkbox = QCheckBox("Partial", self.options_tab)
         options_layout.addWidget(self.partial_checkbox)
-        options_layout.addWidget(
-            QLabel(
-                "Only index the documents in a collection that meet the filter expression entered below:",
-                self.options_tab,
-            )
-        )
-        from PyQt5.QtWidgets import QTextEdit
-
         self.partial_filter_edit = QTextEdit(self.options_tab)
         self.partial_filter_edit.setPlainText("{}")
         options_layout.addWidget(self.partial_filter_edit)
         self.options_tab.setLayout(options_layout)
         self.tabs.addTab(self.options_tab, "Options")
-        layout.addWidget(self.tabs)
-        # Create in background
         self.background_checkbox = QCheckBox("Create in background", self)
-        layout.addWidget(self.background_checkbox)
-        # Buttons
-        btn_layout = QHBoxLayout()
-        self.save_btn = QPushButton("Save")
-        self.cancel_btn = QPushButton("Cancel")
-        btn_layout.addWidget(self.save_btn)
-        btn_layout.addWidget(self.cancel_btn)
-        layout.addLayout(btn_layout)
+        self.save_btn = QPushButton(SAVE_LABEL)
+        self.cancel_btn = QPushButton(CANCEL_LABEL)
+        widgets: list[QWidget] = [QLabel("Index name:"), self.name_edit, self.tabs, self.background_checkbox]
+        button_widgets: list[QWidget] = [self.save_btn, self.cancel_btn]
+        setup_dialog_layout(self, widgets, button_widgets)
         self.save_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
-        # Populate fields if editing
         self._populate_fields_table()
         self.add_field_btn.clicked.connect(self._add_field)
         self.remove_field_btn.clicked.connect(self._remove_field)

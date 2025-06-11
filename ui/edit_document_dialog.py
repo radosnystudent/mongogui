@@ -9,16 +9,15 @@ import json
 from PyQt5.QtGui import QShowEvent
 from PyQt5.QtWidgets import (
     QDialog,
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
     QTextEdit,
-    QVBoxLayout,
     QWidget,
 )
 
 from ui.json_highlighter import JsonHighlighter
+from ui.ui_utils import setup_dialog_layout
 
 
 class EditDocumentDialog(QDialog):
@@ -39,29 +38,21 @@ class EditDocumentDialog(QDialog):
         self.setWindowTitle("Edit Document")
         self.setMinimumSize(700, 500)
         self.document = document
-        layout = QVBoxLayout(self)
 
         self.text_edit = QTextEdit(self)
         self.text_edit.setText(json.dumps(document, indent=2, default=str))
-        layout.addWidget(self.text_edit)
-
         self.highlighter = JsonHighlighter(self.text_edit.document())
-
         self.validation_label = QLabel("")
         self.validation_label.setStyleSheet(
             "color: red; font-size: 15px; font-weight: bold;"
         )
         self.validation_label.setWordWrap(True)
-        layout.addWidget(self.validation_label)
-
-        button_layout = QHBoxLayout()
         self.format_btn = QPushButton("Format")
         self.save_btn = QPushButton("Save")
         self.cancel_btn = QPushButton("Cancel")
-        button_layout.addWidget(self.format_btn)
-        button_layout.addWidget(self.save_btn)
-        button_layout.addWidget(self.cancel_btn)
-        layout.addLayout(button_layout)
+        widgets = [self.text_edit, self.validation_label]
+        button_widgets: list[QWidget] = [self.format_btn, self.save_btn, self.cancel_btn]
+        setup_dialog_layout(self, widgets, button_widgets)
 
         self.format_btn.clicked.connect(self.format_json)
         self.save_btn.clicked.connect(self.accept)

@@ -9,16 +9,15 @@ import json
 from PyQt5.QtGui import QShowEvent
 from PyQt5.QtWidgets import (
     QDialog,
-    QHBoxLayout,
     QLabel,
     QMessageBox,
     QPushButton,
     QTextEdit,
-    QVBoxLayout,
     QWidget,
 )
 
 from ui.json_highlighter import JsonHighlighter
+from ui.ui_utils import setup_dialog_layout
 
 
 class SchemaEditorDialog(QDialog):
@@ -38,11 +37,9 @@ class SchemaEditorDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Edit Collection Schema (JSON)")
         self.resize(700, 550)  # Make dialog larger
-        layout = QVBoxLayout(self)
 
         self.text_edit = QTextEdit(self)
         self.text_edit.setPlainText(initial_schema)
-        layout.addWidget(self.text_edit)
 
         self.highlighter = JsonHighlighter(self.text_edit.document())
 
@@ -51,17 +48,16 @@ class SchemaEditorDialog(QDialog):
             "color: red; font-size: 15px; font-weight: bold;"
         )
         self.validation_label.setWordWrap(True)
-        layout.addWidget(self.validation_label)
 
-        btn_layout = QHBoxLayout()
         self.format_button = QPushButton("Format", self)
-        self.format_button.clicked.connect(self.format_json)
-        btn_layout.addWidget(self.format_button)
         self.save_button = QPushButton("Save", self)
-        self.save_button.clicked.connect(self.accept)
-        btn_layout.addWidget(self.save_button)
-        layout.addLayout(btn_layout)
 
+        widgets = [self.text_edit, self.validation_label]
+        button_widgets: list[QWidget] = [self.format_button, self.save_button]
+        setup_dialog_layout(self, widgets, button_widgets)
+
+        self.format_button.clicked.connect(self.format_json)
+        self.save_button.clicked.connect(self.accept)
         self.text_edit.textChanged.connect(self.validate_json)
         self.validate_json()
 
