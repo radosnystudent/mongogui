@@ -3,6 +3,7 @@ from typing import Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QApplication,
     QDialog,
     QMenu,
     QMessageBox,
@@ -395,8 +396,6 @@ class CollectionPanelMixin:
         self, item: QTreeWidgetItem, column: int
     ) -> None:
         # If MainWindow overrides this, call its version
-        from PyQt5.QtWidgets import QApplication
-
         main_window = QApplication.activeWindow()
         if (
             main_window
