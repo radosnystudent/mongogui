@@ -1,13 +1,18 @@
+import json
+import re
 from typing import Any
 
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
-from db.constants import LIMIT_STAGE, SKIP_STAGE
+from db.constants import (
+    LIMIT_STAGE,
+    MAX_QUERY_LIMIT,
+    NOT_CONNECTED_MSG,
+    SKIP_STAGE,
+)
 from db.query_preprocessor import query_preprocessor
 from db.utils import convert_to_object_id
-
-NOT_CONNECTED_MSG = "Not connected to database"
 
 
 class MongoClientWrapper:
@@ -79,9 +84,6 @@ class MongoClientWrapper:
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
         """Execute a find query with server-side pagination."""
         try:
-            import json
-            import re
-
             pattern = r"db\.(\w+)\.find\((.*)\)"
             match = re.search(pattern, query_text)
             if not match:
@@ -115,16 +117,12 @@ class MongoClientWrapper:
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
         """Execute an aggregate query with server-side pagination."""
         try:
-            import re
-
             pattern = r"db\.(\w+)\.aggregate\((.*)\)"
             match = re.search(pattern, query_text)
             if not match:
                 return "Invalid aggregate query format"
             collection_name = match.group(1)
             pipeline_part = match.group(2).strip()
-            import json
-
             pipeline = json.loads(pipeline_part)
             if not isinstance(pipeline, list):
                 return "Pipeline must be a list"
@@ -171,7 +169,7 @@ class MongoClientWrapper:
 
             db = self.client[db_name]
             collection = db[collection_name]
-            results = list(collection.find(query_dict).limit(1000))
+            results = list(collection.find(query_dict).limit(MAX_QUERY_LIMIT))
             return results
         except Exception as e:
             return str(e)

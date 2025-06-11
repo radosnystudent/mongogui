@@ -1,9 +1,12 @@
 """
 Centralized error handling utilities for MongoDB GUI.
 """
-from typing import Callable, Any
-from PyQt5.QtWidgets import QMessageBox, QWidget
+
 import logging
+from collections.abc import Callable
+from typing import Any
+
+from PyQt5.QtWidgets import QMessageBox, QWidget
 
 
 def handle_exception(
@@ -45,6 +48,7 @@ def error_handling_decorator(
     """
     Decorator to wrap functions with centralized error handling.
     """
+
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
         def wrapper(*args, **kwargs):
             try:
@@ -59,5 +63,7 @@ def error_handling_decorator(
                     log=log,
                 )
                 return None
+
         return wrapper
+
     return decorator

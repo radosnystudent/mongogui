@@ -19,18 +19,16 @@ from PyQt5.QtWidgets import (
 )
 
 from db.connection_manager import ConnectionManager
-from db.mongo_client import MongoClientWrapper
 from db.utils import convert_to_object_id  # Moved import to top
+from ui.collection_panel import CollectionPanelMixin
+from ui.connection_widgets import ConnectionWidgetsMixin
 from ui.constants import EDIT_DOCUMENT_TITLE
 from ui.edit_document_dialog import EditDocumentDialog
 from ui.query_panel import QueryPanelMixin
 from ui.query_tab import QueryTabWidget
 from ui.ui_utils import set_minimum_heights
-from ui.connection_widgets import ConnectionWidgetsMixin
-from ui.collection_panel import CollectionPanelMixin
 from utils.error_handling import handle_exception
 from utils.state_manager import StateManager, StateObserver
-
 
 bson_dumps: Callable[..., str] | None
 try:
