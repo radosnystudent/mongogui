@@ -6,8 +6,7 @@ Main application window for the MongoDB GUI.
 # All UI logic is separated from business logic and database operations.
 # Use composition and the Observer pattern for state management.
 
-from collections.abc import Callable
-from typing import Any, cast
+from typing import Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -27,18 +26,15 @@ from PyQt5.QtWidgets import (
 )
 
 from db.connection_manager import ConnectionManager
-from db.utils import convert_to_object_id  # Moved import to top
 from ui.collection_panel import CollectionPanelMixin
+from ui.connection_manager_window import ConnectionManagerWindow
 from ui.connection_widgets import ConnectionWidgetsMixin
-from ui.constants import EDIT_DOCUMENT_TITLE
 from ui.edit_document_dialog import EditDocumentDialog
 from ui.query_panel import QueryPanelMixin
 from ui.query_tab import QueryTabWidget
 from ui.ui_utils import set_minimum_heights
 from utils.error_handling import handle_exception
 from utils.state_manager import StateManager, StateObserver
-from ui.connection_manager_window import ConnectionManagerWindow
-from ui.index_dialog import IndexEditDialog
 
 try:
     from bson.json_util import dumps as _bson_dumps
@@ -136,9 +132,7 @@ class MainWindow(QMainWindow, StateObserver):
             and active_db_label in self.active_clients
         ):
             mongo_client = self.active_clients[active_db_label]
-        elif (
-            not active_db_label and self.mongo_client
-        ):
+        elif not active_db_label and self.mongo_client:
             mongo_client = self.mongo_client
 
         # Prevent opening a tab if no client is resolved, unless it's the initial state without any tabs.
@@ -324,7 +318,9 @@ class MainWindow(QMainWindow, StateObserver):
 
     def update_document_in_db(self, edited_doc: dict) -> None:
         if not self.mongo_client or "_id" not in edited_doc:
-            QMessageBox.warning(self, "Update Error", "No MongoDB client or missing _id.")
+            QMessageBox.warning(
+                self, "Update Error", "No MongoDB client or missing _id."
+            )
             return
         try:
             result = self.mongo_client.update_document(

@@ -8,15 +8,17 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
+    QHeaderView,
+    QLabel,
     QMenu,
     QMessageBox,
     QSplitter,  # Added QSplitter
     QTableWidgetItem,
     QTextEdit,
     QTreeWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
-from PyQt5.QtWidgets import QHeaderView, QLabel, QVBoxLayout
 
 from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE, SCHEMA_DIR
 from ui.edit_document_dialog import EditDocumentDialog

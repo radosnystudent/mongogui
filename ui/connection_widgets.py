@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING, Any
-from PyQt5.QtWidgets import QTextEdit
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -8,6 +7,7 @@ from PyQt5.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )

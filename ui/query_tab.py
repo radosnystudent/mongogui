@@ -1,7 +1,6 @@
 import re
 from collections.abc import Callable
 from typing import Any
-from utils.error_handling import handle_exception
 
 from PyQt5.QtCore import QEvent, QObject, Qt
 from PyQt5.QtGui import QKeyEvent
@@ -23,6 +22,7 @@ from PyQt5.QtWidgets import (
 
 from ui.query_panel import QueryPanelMixin
 from ui.ui_utils import set_minimum_heights
+from utils.error_handling import handle_exception
 
 
 class QueryTabWidget(QWidget, QueryPanelMixin):

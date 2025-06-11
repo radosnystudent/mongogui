@@ -5,6 +5,7 @@ Provides color highlighting for JSON keys, values, punctuation, numbers, boolean
 """
 
 import re
+
 from PyQt5.QtGui import QColor, QSyntaxHighlighter, QTextCharFormat, QTextDocument
 
 

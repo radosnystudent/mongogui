@@ -6,12 +6,12 @@ This script automatically detects the platform and runs the appropriate
 startup script or launches the application directly.
 """
 
+import importlib.util
 import os
 import platform
 import subprocess
 import sys
 from pathlib import Path
-import importlib.util
 
 
 def detect_platform() -> str:
