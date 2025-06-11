@@ -144,17 +144,16 @@ class MainWindow(
         # If mongo_client is still None here, it means we are in the initial empty state or a connection is missing.
         # QueryTabWidget can handle a None mongo_client initially.
 
-        actual_collection_name_for_tab = None  # Always open DB-level tabs
+        # Only set collection_name to None for DB-level tabs (when collection_name is not provided)
+        actual_collection_name_for_tab = collection_name if collection_name else None
         tab_title = f"Query - {active_db_label}" if active_db_label else "New Query"
         if collection_name and active_db_label and collection_name != active_db_label:
-            # This case should ideally not be hit if we always open DB tabs
-            # but kept for robustness if collection_name is passed for other reasons.
-            # Forcing DB level tab for now.
-            pass  # tab_title already set for DB level
+            # If a collection is specified, show it in the tab title
+            tab_title = f"Query - {active_db_label}.{collection_name}"
 
         tab = QueryTabWidget(
             parent=self,
-            collection_name=actual_collection_name_for_tab,  # Explicitly None for DB context
+            collection_name=actual_collection_name_for_tab,
             db_label=active_db_label,
             mongo_client=mongo_client,
             on_close=self._close_query_tab_by_widget,
@@ -183,7 +182,8 @@ class MainWindow(
         parent_db_item = item.parent()
         if parent_db_item:
             db_label = parent_db_item.text(0)
-            self.add_query_tab(db_label=db_label, collection_name=None)
+            collection_name = item.text(0)
+            self.add_query_tab(db_label=db_label, collection_name=collection_name)
         else:
             QMessageBox.warning(
                 self,
@@ -244,7 +244,7 @@ class MainWindow(
                 Qt.ContextMenuPolicy.CustomContextMenu
             )
             self.collection_tree.customContextMenuRequested.connect(
-                lambda pos: self.show_collection_context_menu(item, pos)
+                lambda pos: self.on_collection_tree_context_menu(pos)
             )
         else:
             self.collection_tree.setContextMenuPolicy(

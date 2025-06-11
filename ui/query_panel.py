@@ -1,3 +1,5 @@
+import json
+import os
 from collections.abc import Callable
 from typing import Any
 
@@ -16,6 +18,23 @@ from PyQt5.QtWidgets import (
 
 from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
 from ui.edit_document_dialog import EditDocumentDialog
+
+SCHEMA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schemas")
+
+
+def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
+    """Given a schema dict and a path (e.g., ["covers"]), return available fields at that path."""
+    node = schema
+    for part in path:
+        if isinstance(node, dict) and part in node:
+            node = node[part]
+            if isinstance(node, list) and node and isinstance(node[0], dict):
+                node = node[0]
+        else:
+            return []
+    if isinstance(node, dict):
+        return list(node.keys())
+    return []  # type: ignore[unreachable]
 
 
 class QueryPanelMixin:
@@ -622,3 +641,29 @@ class QueryPanelMixin:
             self.json_tree.hide()  # Explicitly hide
 
         # Redundant parent updates removed as _remove_previous_summary_widget now handles splitter updates.
+
+    def get_collection_schema_fields(
+        self, db: str, collection: str, path: list[str]
+    ) -> list[str]:
+        schema_path = os.path.join(SCHEMA_DIR, f"{db}__{collection}.json")
+        if not os.path.exists(schema_path):
+            return []
+        try:
+            with open(schema_path, encoding="utf-8") as f:
+                schema = json.load(f)
+            return get_schema_fields_for_path(schema, path)
+        except Exception:
+            return []
+
+    def provide_query_suggestions(
+        self, text: str, db: str, collection: str
+    ) -> list[str]:
+        """Return field suggestions based on schema and current query context."""
+        # Simple parser: look for db.collection.find({"field1.field2.")
+        import re
+
+        m = re.search(rf"db\\.{collection}\\.find\\(\{{.*?([\w\.]+)\\.$", text)
+        if not m:
+            return []
+        path = m.group(1).split(".")
+        return self.get_collection_schema_fields(db, collection, path)
