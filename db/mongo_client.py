@@ -24,6 +24,7 @@ class MongoClientWrapper:
         password: str | None,
         tls: bool,
     ) -> bool:
+        """Connect to a MongoDB instance with or without authentication and TLS."""
         try:
             if login and password:
                 uri = f"mongodb://{login}:{password}@{ip}:{port}/{db}"
@@ -35,8 +36,7 @@ class MongoClientWrapper:
                 options["tls"] = True
 
             self.client = MongoClient(uri, **options)
-            self.current_db = db  # Test connection
-            self.client.admin.command("ping")
+            self.current_db = db
             return True
         except PyMongoError:
             return False

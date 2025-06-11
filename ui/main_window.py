@@ -252,56 +252,41 @@ class MainWindow(
             )
 
     def execute_query(self) -> None:
+        """Delegate query execution to the current QueryTabWidget, or show warning if none selected."""
         current_tab = self.query_tabs.currentWidget()
         if not isinstance(current_tab, QueryTabWidget):
             QMessageBox.warning(self, "Query Error", "No active query tab selected.")
             return
-
-        # Delegate query execution to the current QueryTabWidget
-        # The QueryTabWidget itself should handle getting the mongo_client and db_label
         current_tab.execute_query()
 
-        # The following logic for displaying results in MainWindow might be redundant
-        # if QueryTabWidget handles its own display. Review and remove if necessary.
-        # For now, we assume QueryTabWidget updates its own UI.
-        # If MainWindow needs to react to results (e.g. status bar), signals/slots would be better.
-
-    # display_results, display_table_results, display_tree_results, edit_document,
-    # update_document_in_db, add_tree_item, clear_query, previous_page, next_page
-    # are primarily for the QueryPanelMixin and should ideally be managed by QueryTabWidget.
-    # MainWindow might not need its own implementations if QueryTabWidget is self-contained.
-    # For now, let's leave them but note they might become obsolete or need refactoring.
-
     def display_results(self) -> None:
-        # This method in MainWindow might be deprecated if QueryTabWidget handles its own display.
-        # Forwarding to current tab for now, or consider removing.
+        """Display query results in the current tab or fallback to main window table/tree."""
         current_tab = self.query_tabs.currentWidget()
         if isinstance(current_tab, QueryTabWidget):
-            # current_tab.display_results() # QueryTabWidget.display_results will be called by its own execute_query
-            pass  # Results are displayed within the tab itself.
-        elif not self.results:  # Fallback for old direct execution path (if any)
+            # QueryTabWidget handles its own display_results
+            return
+        elif not self.results:
             if self.data_table:
                 self.data_table.setRowCount(0)
             return
-
-        # Calculate pagination
+        # Fallback: display results in main window widgets
         start_idx = self.current_page * self.page_size
         end_idx = min(start_idx + self.page_size, len(self.results))
         page_results = self.results[start_idx:end_idx]
-
-        # Update navigation controls
         self.prev_btn.setEnabled(self.current_page > 0)
         self.next_btn.setEnabled(end_idx < len(self.results))
         self.page_label.setText(f"Page {self.current_page + 1}")
         self.result_count_label.setText(
             f"Showing {start_idx + 1}-{end_idx} of {len(self.results)} results"
         )
-
-        # Display in table format
         self.display_table_results(page_results)
-
-        # Display in tree format
         self.display_tree_results(page_results)
+
+    # display_results, display_table_results, display_tree_results, edit_document,
+    # update_document_in_db, add_tree_item, clear_query, previous_page, next_page
+    # are primarily for the QueryPanelMixin and should ideally be managed by QueryTabWidget.
+    # MainWindow might not need its own implementations if QueryTabWidget is self-contained.
+    # For now, let's leave them but note they might become obsolete or need refactoring.
 
     def display_table_results(self, results: list[dict[str, Any]]) -> None:
         if not results or not self.data_table:
