@@ -85,5 +85,9 @@ class SchemaEditorDialog(QDialog):
         try:
             json.loads(self.text_edit.toPlainText())
             self.validation_label.setText("")
+            self.save_button.setEnabled(True)  # Enable "Save" button if JSON is valid
         except Exception as e:
             self.validation_label.setText(f"Invalid JSON: {e}")
+            self.save_button.setEnabled(
+                False
+            )  # Disable "Save" button if JSON is invalid

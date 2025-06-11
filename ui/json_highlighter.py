@@ -21,39 +21,48 @@ class JsonHighlighter(QSyntaxHighlighter):
         self.brace_format = QTextCharFormat()
         self.brace_format.setForeground(QColor("#000000"))
 
-    def highlightBlock(self, text: str | None) -> None:
+        # Pre-compile regular expressions
         import re
 
+        self.key_regex = re.compile(r'"(\\.|[^"\\])*"(?=\s*:)')
+        self.punct_regex = re.compile(r"[:,]")
+        self.value_regex = re.compile(r'(?<=:)\s*"(\\.|[^"\\])*"')
+        self.number_regex = re.compile(r"\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b")
+        self.bool_regex = re.compile(r"\btrue\b|\bfalse\b")
+        self.null_regex = re.compile(r"\bnull\b")
+        self.brace_regex = re.compile(r"[\{\}\[\]]")
+
+    def highlightBlock(self, text: str | None) -> None:
         if text is None:
             return
         # Keys ("key") in blue (with quotes)
-        for match in re.finditer(r'"(\\.|[^"\\])*"(?=\s*:)', text):
+        for match in self.key_regex.finditer(text):
             self.setFormat(match.start(), match.end() - match.start(), self.key_format)
         # Punctuation : and , in red
-        for match in re.finditer(r"[:,]", text):
+        for match in self.punct_regex.finditer(text):
             self.setFormat(
                 match.start(), match.end() - match.start(), self.punct_format
             )
         # Values ("value") in black (with quotes, after colon)
-        for match in re.finditer(r'(?<=:)\s*"(\\.|[^"\\])*"', text):
-            value_match = re.search(r'"(\\.|[^"\\])*"', match.group(0))
+        for match in self.value_regex.finditer(text):
+            value_match = self.key_regex.search(match.group(0))
             if value_match:
                 value_start = match.start() + value_match.start()
                 value_len = value_match.end() - value_match.start()
                 self.setFormat(value_start, value_len, self.value_format)
         # Numbers
-        for match in re.finditer(r"\b-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\b", text):
+        for match in self.number_regex.finditer(text):
             self.setFormat(
                 match.start(), match.end() - match.start(), self.number_format
             )
         # Booleans
-        for match in re.finditer(r"\btrue\b|\bfalse\b", text):
+        for match in self.bool_regex.finditer(text):
             self.setFormat(match.start(), match.end() - match.start(), self.bool_format)
         # Null
-        for match in re.finditer(r"\bnull\b", text):
+        for match in self.null_regex.finditer(text):
             self.setFormat(match.start(), match.end() - match.start(), self.null_format)
         # Braces
-        for match in re.finditer(r"[\{\}\[\]]", text):
+        for match in self.brace_regex.finditer(text):
             self.setFormat(
                 match.start(), match.end() - match.start(), self.brace_format
             )

@@ -16,10 +16,8 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
-from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE
+from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE, SCHEMA_DIR
 from ui.edit_document_dialog import EditDocumentDialog
-
-SCHEMA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schemas")
 
 
 def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:

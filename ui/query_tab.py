@@ -5,7 +5,6 @@ from PyQt5.QtCore import QEvent, QObject, Qt
 from PyQt5.QtGui import QKeyEvent
 from PyQt5.QtWidgets import (
     QComboBox,
-    QCompleter,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -136,7 +135,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         layout.addWidget(results_splitter, stretch=1)
         set_minimum_heights(self)
         self.setLayout(layout)
-        self._completer = QCompleter([], self)
 
         self._suggestion_popup = QListWidget(self)
         self._suggestion_popup.setWindowFlags(
@@ -310,9 +308,12 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
 
         if key in (Qt.Key.Key_Down, Qt.Key.Key_Up):
             self._suggestion_popup.setFocus()
-            self._suggestion_popup.setCurrentRow(0)
-            return True
-        if key == Qt.Key.Key_Escape:
+            current_row = self._suggestion_popup.currentRow()
+            if key == Qt.Key.Key_Down:
+                new_row = min(current_row + 1, self._suggestion_popup.count() - 1)
+            else:  # key == Qt.Key.Key_Up
+                new_row = max(current_row - 1, 0)
+            self._suggestion_popup.setCurrentRow(new_row)
             self._hide_suggestion_popup()
             return True
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):

@@ -14,10 +14,9 @@ from PyQt5.QtWidgets import (
     QWidget,
 )
 
+from ui.constants import SCHEMA_DIR
 from ui.index_dialog import IndexDialog
 from ui.schema_editor_dialog import SchemaEditorDialog
-
-SCHEMA_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "schemas")
 
 
 class CollectionPanelMixin:
