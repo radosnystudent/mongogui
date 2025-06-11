@@ -1,11 +1,14 @@
 from collections.abc import Callable
 from typing import Any
 
-from PyQt5.QtCore import Qt
+from PyQt5.QtCore import QEvent, QObject, Qt
+from PyQt5.QtGui import QKeyEvent
 from PyQt5.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QPushButton,
     QSplitter,
     QStackedWidget,
@@ -53,9 +56,13 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         layout.addWidget(query_label)
         self.query_input = QTextEdit()
         self.query_input.setFixedHeight(100)
+        # Always set placeholder
         self.query_input.setPlaceholderText(
             f"Enter MongoDB query (e.g., db.{self.collection_name or 'collection'}.find({{}}))"
         )
+        # Set initial query if collection_name is provided
+        if self.collection_name:
+            self.query_input.setText(f"db.{self.collection_name}.find({{}})")
         layout.addWidget(self.query_input)
         # Query controls
         query_controls = QHBoxLayout()
@@ -128,6 +135,17 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         layout.addWidget(results_splitter, stretch=1)
         set_minimum_heights(self)
         self.setLayout(layout)
+
+        self._suggestion_popup = QListWidget(self)
+        self._suggestion_popup.setWindowFlags(
+            self._suggestion_popup.windowFlags() | Qt.WindowType.Popup
+        )
+        self._suggestion_popup.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self._suggestion_popup.setMouseTracking(True)
+        self._suggestion_popup.hide()
+        self._suggestion_popup.itemClicked.connect(self._insert_suggestion)
+        self.query_input.installEventFilter(self)
+        self._popup_shown = False
 
     def _close_tab(self) -> None:
         if self.on_close:
@@ -221,3 +239,101 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         # Hide the unused view for accessibility
         self.json_tree.setVisible(self.view_mode_combo.currentIndex() == 0)
         self.data_table.setVisible(self.view_mode_combo.currentIndex() == 1)
+
+    def _get_field_path_at_cursor(self) -> list[str]:
+        """Parse the query and cursor position to extract the field path for suggestions."""
+        text = self.query_input.toPlainText()
+        cursor = self.query_input.textCursor()
+        pos = cursor.position()
+        before = text[:pos]
+        import re
+
+        # Try to find the last field path before the cursor, e.g. {"documents. or {documents.documentId.
+        m = re.search(r"\{[^{}]*?([\w\.]+\.)?$", before)
+        if m:
+            path_str = m.group(1)
+            if path_str:
+                return [p for p in path_str.strip(".").split(".") if p]
+        return []
+
+    def _show_schema_suggestions(self) -> None:
+        db = self.db_label or self.last_db_label
+        collection = self.collection_name or self.last_collection
+        # If collection is not set, try to extract from query input
+        if not collection:
+            import re
+
+            text = self.query_input.toPlainText()
+            m = re.search(r"db\.(\w+)\.find", text)
+            if m:
+                collection = m.group(1)
+        if not db or not collection:
+            self._hide_suggestion_popup()
+            return
+        path = self._get_field_path_at_cursor()
+        suggestions = self.get_collection_schema_fields(db, collection, path)
+        if suggestions:
+            self._show_suggestion_popup(suggestions)
+        else:
+            self._hide_suggestion_popup()
+
+    def _show_suggestion_popup(self, suggestions: list[str]) -> None:
+        """Show the suggestion popup with the given list of suggestions."""
+        self._suggestion_popup.clear()
+        self._suggestion_popup.addItems(suggestions)
+        cursor_rect = self.query_input.cursorRect()
+        popup_pos = self.query_input.mapToGlobal(cursor_rect.bottomLeft())
+        self._suggestion_popup.move(popup_pos)
+        self._suggestion_popup.setCurrentRow(0)
+        self._suggestion_popup.show()
+        self._popup_shown = True
+
+    # PyQt5 expects the argument names to be a0 and a1 for eventFilter, but for clarity, we alias them internally.
+    def eventFilter(self, a0: QObject | None, a1: QEvent | None) -> bool:
+        watched = a0
+        event = a1
+        if watched is not self.query_input:
+            return super().eventFilter(watched, event)
+        if event is None or event.type() != QEvent.Type.KeyPress:
+            return super().eventFilter(watched, event)
+        if not isinstance(event, QKeyEvent):
+            return super().eventFilter(watched, event)
+
+        key = event.key()
+        if key == Qt.Key.Key_F1:
+            self._show_schema_suggestions()
+            return True
+        if not self._popup_shown:
+            return super().eventFilter(watched, event)
+
+        if key in (Qt.Key.Key_Down, Qt.Key.Key_Up):
+            self._suggestion_popup.setFocus()
+            current_row = self._suggestion_popup.currentRow()
+            if key == Qt.Key.Key_Down:
+                new_row = min(current_row + 1, self._suggestion_popup.count() - 1)
+            else:  # key == Qt.Key.Key_Up
+                new_row = max(current_row - 1, 0)
+            self._suggestion_popup.setCurrentRow(new_row)
+            self._hide_suggestion_popup()
+            return True
+        if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            current = self._suggestion_popup.currentItem()
+            if current:
+                self._insert_suggestion(current)
+                return True
+        return super().eventFilter(watched, event)
+
+    def _insert_suggestion(self, item: QListWidgetItem | None) -> None:
+        if item is None:
+            return
+        suggestion = item.text()
+        cursor = self.query_input.textCursor()
+        # Insert at cursor position, add quotes if not present
+        if not (suggestion.startswith('"') or suggestion.startswith("'")):
+            suggestion = f'"{suggestion}"'
+        cursor.insertText(suggestion)
+        self._hide_suggestion_popup()
+
+    def _hide_suggestion_popup(self) -> None:
+        self._suggestion_popup.hide()
+        self._popup_shown = False

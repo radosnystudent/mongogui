@@ -1,4 +1,5 @@
-from typing import TYPE_CHECKING, Any
+import os
+from typing import Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -6,21 +7,22 @@ from PyQt5.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QTextEdit,
     QTreeWidget,
     QTreeWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
 
+from ui.constants import SCHEMA_DIR
 from ui.index_dialog import IndexDialog
-
-if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QTextEdit, QVBoxLayout
+from ui.schema_editor_dialog import SchemaEditorDialog
 
 
 class CollectionPanelMixin:
-    collection_layout: "QVBoxLayout"
+    collection_layout: QVBoxLayout
     mongo_client: Any
-    result_display: "QTextEdit"
+    result_display: QTextEdit | None = None
     query_input: Any
     collection_tree: QTreeWidget  # Added collection_tree attribute
 
@@ -329,6 +331,7 @@ class CollectionPanelMixin:
         self, menu: QMenu, viewport: QWidget | None, pos: Any, data: dict
     ) -> None:
         manage_action = menu.addAction("Manage indexes")
+        schema_action = menu.addAction("Edit schema (JSON)")
         action = menu.exec_(
             viewport.mapToGlobal(pos)
             if viewport is not None
@@ -336,6 +339,44 @@ class CollectionPanelMixin:
         )
         if action == manage_action:
             self.show_add_index_dialog(data["name"], item=None)
+        elif action == schema_action:
+            self.edit_collection_schema(data)
+
+    def edit_collection_schema(self, data: dict) -> None:
+        """Open dialog to edit or create the schema JSON for a collection."""
+        db = data.get("db")
+        collection = data.get("name")
+        if not db or not collection:
+            QMessageBox.warning(
+                self.collection_tree, "Error", "Invalid collection info."
+            )
+            return
+        os.makedirs(SCHEMA_DIR, exist_ok=True)
+        schema_path = os.path.join(SCHEMA_DIR, f"{db}__{collection}.json")
+        initial_schema = ""
+        if os.path.exists(schema_path):
+            try:
+                with open(schema_path, encoding="utf-8") as f:
+                    initial_schema = f.read()
+            except Exception as e:
+                QMessageBox.critical(
+                    self.collection_tree, "Error reading schema file", str(e)
+                )
+                return
+        dlg = SchemaEditorDialog(self.collection_tree, initial_schema)
+        if dlg.exec_() == QDialog.Accepted:
+            try:
+                with open(schema_path, "w", encoding="utf-8") as f:
+                    f.write(dlg.get_schema())
+                QMessageBox.information(
+                    self.collection_tree,
+                    "Schema Saved",
+                    f"Schema for '{collection}' saved.",
+                )
+            except Exception as e:
+                QMessageBox.critical(
+                    self.collection_tree, "Error saving schema file", str(e)
+                )
 
     def _handle_index_context_menu(
         self, menu: QMenu, viewport: QWidget | None, pos: Any, data: dict
