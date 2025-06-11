@@ -24,14 +24,18 @@ def detect_platform() -> str:
         return "unknown"
 
 
-def run_command(command: list[str], shell: bool = False) -> bool:
-    """Run a command and return success status."""
+def run_command(command: list[str] | str, shell: bool = False) -> bool:
+    """Run a command and return success status. Avoid shell=True unless absolutely necessary."""
+    import shlex
     if shell:
-        # nosec B602: subprocess call with shell=True identified, security issue.
-        # This is only used for trusted scripts, not user input.
-        pass
+        # SECURITY: Avoid shell=True unless absolutely necessary and only for static, trusted commands.
+        if not isinstance(command, str):
+            raise ValueError("When using shell=True, command must be a static string.")
+        cmd = shlex.split(command)
+    else:
+        cmd = command
     try:
-        result = subprocess.run(command, shell=shell, check=True)
+        result = subprocess.run(cmd, shell=shell, check=True)
         return result.returncode == 0
     except subprocess.CalledProcessError:
         return False

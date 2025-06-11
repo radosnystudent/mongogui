@@ -1,3 +1,9 @@
+"""
+Dialog for editing a MongoDB document in JSON format.
+
+Provides a PyQt5 dialog for editing, validating, and formatting a document.
+"""
+
 import json
 
 from PyQt5.QtGui import QShowEvent
@@ -16,7 +22,19 @@ from ui.json_highlighter import JsonHighlighter
 
 
 class EditDocumentDialog(QDialog):
+    """
+    Dialog for editing a MongoDB document in JSON format.
+    Provides validation, formatting, and user feedback for editing documents.
+    """
+
     def __init__(self, document: dict, parent: QWidget | None = None) -> None:
+        """
+        Initialize the EditDocumentDialog.
+
+        Args:
+            document: The document to edit.
+            parent: Optional parent QWidget.
+        """
         super().__init__(parent)
         self.setWindowTitle("Edit Document")
         self.setMinimumSize(700, 500)
@@ -52,6 +70,10 @@ class EditDocumentDialog(QDialog):
         self.validate_json()
 
     def format_json(self) -> None:
+        """
+        Format the JSON in the text edit widget for readability.
+        Shows an error message if the JSON is invalid.
+        """
         try:
             obj = json.loads(self.text_edit.toPlainText())
             pretty = json.dumps(obj, indent=4, ensure_ascii=False)
@@ -60,6 +82,10 @@ class EditDocumentDialog(QDialog):
             QMessageBox.critical(self, "Invalid JSON", f"Error: {e}")
 
     def validate_json(self) -> None:
+        """
+        Validate the JSON in the text edit widget.
+        Updates the validation label with errors if present.
+        """
         try:
             json.loads(self.text_edit.toPlainText())
             self.validation_label.setText("")
@@ -67,6 +93,13 @@ class EditDocumentDialog(QDialog):
             self.validation_label.setText(f"Invalid JSON: {e}")
 
     def get_edited_document(self) -> dict | None:
+        """
+        Get the edited document as a dictionary if valid JSON, else None.
+        Shows an error message if parsing fails.
+
+        Returns:
+            The edited document as a dict, or None if invalid.
+        """
         try:
             self._edited_doc = json.loads(self.text_edit.toPlainText())
         except Exception as e:
@@ -79,6 +112,9 @@ class EditDocumentDialog(QDialog):
         )
 
     def showEvent(self, a0: QShowEvent | None) -> None:
+        """
+        Format the JSON when the dialog is shown, if possible.
+        """
         try:
             raw = self.text_edit.toPlainText()
             if raw.strip():

@@ -17,7 +17,16 @@ from db.utils import convert_to_object_id
 
 
 class MongoClientWrapper:
+    """
+    Wrapper for PyMongo's MongoClient with additional logic for query execution, connection management,
+    and error handling for the MongoDB GUI application.
+    """
+
     def __init__(self) -> None:
+        """
+        Initialize the MongoClientWrapper instance.
+        Sets up the client and current database state.
+        """
         self.client: MongoClient[dict[str, Any]] | None = None
         self.current_db: str = ""
 
@@ -30,7 +39,19 @@ class MongoClientWrapper:
         password: str | None,
         tls: bool,
     ) -> bool:
-        """Connect to a MongoDB instance with or without authentication and TLS."""
+        """
+        Connect to a MongoDB instance with or without authentication and TLS.
+
+        Args:
+            ip: Host IP address.
+            port: Port number.
+            db: Database name.
+            login: Username (optional).
+            password: Password (optional).
+            tls: Whether to use TLS/SSL.
+        Returns:
+            True if connection is successful, False otherwise.
+        """
         try:
             if login and password:
                 uri = f"mongodb://{login}:{password}@{ip}:{port}/{db}"
@@ -48,7 +69,12 @@ class MongoClientWrapper:
             return False
 
     def list_collections(self) -> list[str]:
-        """List all collections in the current database."""
+        """
+        List all collections in the current database.
+
+        Returns:
+            List of collection names, or empty list if not connected or error occurs.
+        """
         if self.client is None:
             return []
 
@@ -61,7 +87,17 @@ class MongoClientWrapper:
     def execute_query(
         self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
     ) -> Result[list[dict[str, Any]] | dict[str, Any], str]:
-        """Execute a MongoDB query from text and return results. Supports server-side pagination."""
+        """
+        Execute a MongoDB query from text and return results. Supports server-side pagination.
+
+        Args:
+            query_text: The MongoDB query as a string.
+            page: Page number for pagination.
+            page_size: Number of documents per page.
+            explain: Whether to return query plan/explain output.
+        Returns:
+            Result object containing query results or error message.
+        """
         if self.client is None:
             return Result.Err(NOT_CONNECTED_MSG)
         try:
@@ -85,7 +121,17 @@ class MongoClientWrapper:
     def _execute_find_query(
         self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
-        """Execute a find query with server-side pagination."""
+        """
+        Execute a find query with server-side pagination.
+
+        Args:
+            query_text: The MongoDB find query as a string.
+            page: Page number for pagination.
+            page_size: Number of documents per page.
+            explain: Whether to return query plan/explain output.
+        Returns:
+            List of documents, explain output, or error message string.
+        """
         try:
             pattern = r"db\.(\w+)\.find\((.*)\)"
             match = re.search(pattern, query_text)
@@ -118,7 +164,17 @@ class MongoClientWrapper:
     def _execute_aggregate_query(
         self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
-        """Execute an aggregate query with server-side pagination."""
+        """
+        Execute an aggregate query with server-side pagination.
+
+        Args:
+            query_text: The MongoDB aggregate query as a string.
+            page: Page number for pagination.
+            page_size: Number of documents per page.
+            explain: Whether to return query plan/explain output.
+        Returns:
+            List of documents, explain output, or error message string.
+        """
         try:
             pattern = r"db\.(\w+)\.aggregate\((.*)\)"
             match = re.search(pattern, query_text)
@@ -165,7 +221,16 @@ class MongoClientWrapper:
     def run_query(
         self, db_name: str, collection_name: str, query_dict: dict[str, Any]
     ) -> list[dict[str, Any]] | str:
-        """Run a query with specified parameters."""
+        """
+        Run a query with specified parameters.
+
+        Args:
+            db_name: The name of the database.
+            collection_name: The name of the collection.
+            query_dict: The query criteria as a dictionary.
+        Returns:
+            List of matching documents, or error message string.
+        """
         try:
             if self.client is None:
                 return NOT_CONNECTED_MSG
@@ -180,7 +245,16 @@ class MongoClientWrapper:
     def run_aggregate(
         self, db_name: str, collection_name: str, pipeline: list[dict[str, Any]]
     ) -> list[dict[str, Any]] | str:
-        """Run an aggregation pipeline."""
+        """
+        Run an aggregation pipeline.
+
+        Args:
+            db_name: The name of the database.
+            collection_name: The name of the collection.
+            pipeline: The aggregation pipeline as a list of stages.
+        Returns:
+            List of documents resulting from the aggregation, or error message string.
+        """
         try:
             if self.client is None:
                 return NOT_CONNECTED_MSG
@@ -195,7 +269,16 @@ class MongoClientWrapper:
     def update_document(
         self, collection_name: str, doc_id: Any, new_doc: dict[str, Any]
     ) -> bool:
-        """Update a document by _id in the given collection."""
+        """
+        Update a document by _id in the given collection.
+
+        Args:
+            collection_name: The name of the collection.
+            doc_id: The _id of the document to update.
+            new_doc: The new document data as a dictionary.
+        Returns:
+            True if the document was updated, False otherwise.
+        """
         if self.client is None:
             return False
         try:
@@ -210,7 +293,14 @@ class MongoClientWrapper:
             return False
 
     def list_indexes(self, collection_name: str) -> Result[list[dict[str, Any]], str]:
-        """List all indexes for a collection."""
+        """
+        List all indexes for a collection.
+
+        Args:
+            collection_name: The name of the collection.
+        Returns:
+            Result object containing a list of indexes or error message.
+        """
         if self.client is None:
             return Result.Err(NOT_CONNECTED_MSG)
         try:
@@ -224,7 +314,16 @@ class MongoClientWrapper:
     def create_index(
         self, collection_name: str, keys: Any, **kwargs: Any
     ) -> Result[str, str]:
-        """Create an index on a collection. Keys is a list of (field, direction) tuples."""
+        """
+        Create an index on a collection. Keys is a list of (field, direction) tuples.
+
+        Args:
+            collection_name: The name of the collection.
+            keys: The index keys and their directions.
+            **kwargs: Additional index options.
+        Returns:
+            Result object containing the index name or error message.
+        """
         if self.client is None:
             return Result.Err(NOT_CONNECTED_MSG)
         try:
@@ -236,7 +335,15 @@ class MongoClientWrapper:
             return Result.Err(f"Create index error: {str(e)}")
 
     def drop_index(self, collection_name: str, index_name: str) -> bool | str:
-        """Drop an index by name from a collection."""
+        """
+        Drop an index by name from a collection.
+
+        Args:
+            collection_name: The name of the collection.
+            index_name: The name of the index to drop.
+        Returns:
+            True if the index was dropped, error message string otherwise.
+        """
         if self.client is None:
             return NOT_CONNECTED_MSG
         try:
@@ -250,7 +357,17 @@ class MongoClientWrapper:
     def update_index(
         self, collection_name: str, index_name: str, keys: list[Any], **kwargs: Any
     ) -> str | Any:
-        """Update an index by dropping and recreating it."""
+        """
+        Update an index by dropping and recreating it.
+
+        Args:
+            collection_name: The name of the collection.
+            index_name: The name of the index to update.
+            keys: The new index keys and their directions.
+            **kwargs: Additional index options.
+        Returns:
+            Result object containing the new index name or error message.
+        """
         drop_result = self.drop_index(collection_name, index_name)
         if drop_result is not True:
             return drop_result

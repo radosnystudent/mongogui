@@ -22,7 +22,15 @@ from utils.error_handling import handle_exception
 
 
 def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
-    """Given a schema dict and a path (e.g., ["covers"]), return available fields at that path."""
+    """
+    Given a schema dict and a path (e.g., ["covers"]), return available fields at that path.
+
+    Args:
+        schema: The schema dictionary.
+        path: List of keys representing the path in the schema.
+    Returns:
+        List of available field names at the specified path.
+    """
     node = schema
     for part in path:
         if isinstance(node, dict) and part in node:
@@ -37,6 +45,11 @@ def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
 
 
 class QueryPanelMixin:
+    """
+    Mixin for query panel logic, providing query execution, result display, and related UI logic.
+    Intended to be used with PyQt5 QWidget subclasses.
+    """
+
     mongo_client: Any
     result_display: "QTextEdit"
     query_input: Any
@@ -56,6 +69,10 @@ class QueryPanelMixin:
     _explain_summary_widget: QWidget | None = None
 
     def execute_query(self) -> None:
+        """
+        Execute the current query in the query input widget and update the results display.
+        Handles error reporting and updates UI state accordingly.
+        """
         if not self.mongo_client:
             self._set_db_info_label("No database connection")
             return
@@ -82,11 +99,21 @@ class QueryPanelMixin:
             self._set_db_info_label(f"Query error: {str(e)}")
 
     def _set_db_info_label(self, text: str) -> None:
+        """
+        Set the database info label text, if present.
+
+        Args:
+            text: The text to display in the info label.
+        """
         label = getattr(self, "db_info_label", None)
         if label and hasattr(label, "setText"):
             label.setText(text)
 
     def display_results(self) -> None:
+        """
+        Display the query results in the UI, updating the table and tree widgets as needed.
+        Handles empty result cases and resets UI state.
+        """
         # Reset UI state properly for query results
         self._reset_ui_for_query_results()
 

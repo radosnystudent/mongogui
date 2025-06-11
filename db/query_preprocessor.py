@@ -1,8 +1,8 @@
 """
-Query preprocessing module for MongoDB GUI.
+Preprocesses MongoDB queries for the GUI application.
 
-This module provides functionality to transform user-friendly query syntax
-into valid JSON format for MongoDB operations.
+This module provides functions to preprocess and validate MongoDB queries before execution.
+Extend with additional query preprocessing logic as needed.
 """
 
 import re
@@ -33,6 +33,15 @@ class QueryPreprocessor:
         return self._make_json_compliant(query)
 
     def _extract_and_fix_query_part(self, query: str) -> str:
+        """
+        Extract and fix the query part from a db.collection.find({...}) or db.collection.aggregate([...]).
+
+        Args:
+            query: The raw query string
+
+        Returns:
+            The extracted and fixed query part, or the original query if no match is found
+        """
         find_pattern: str = (
             r"db\.(\w+)\.(find|findOne)\s*\(\s*(.+?)\s*\)(?:\s*\.\s*|\s*$)"
         )
@@ -43,6 +52,17 @@ class QueryPreprocessor:
         def _extract(
             pattern: str, query: str, is_aggregate: bool = False
         ) -> str | None:
+            """
+            Extract and fix the query or aggregation part using the given pattern.
+
+            Args:
+                pattern: The regex pattern to use for extraction
+                query: The raw query string
+                is_aggregate: Flag indicating if the extraction is for an aggregation query
+
+            Returns:
+                The extracted and fixed query part, or None if no match is found
+            """
             match = re.search(pattern, query, re.DOTALL)
             if not match:
                 return None
@@ -66,6 +86,12 @@ class QueryPreprocessor:
         Transform user-friendly syntax to valid JSON.
 
         Handles unquoted field names and other common syntax issues.
+
+        Args:
+            text: The text to transform
+
+        Returns:
+            The transformed text, compliant with JSON syntax
         """
         text = text.strip()
 
@@ -81,7 +107,15 @@ class QueryPreprocessor:
         return text
 
     def _fix_object_keys(self, obj_str: str) -> str:
-        """Fix unquoted keys in an object string."""
+        """
+        Fix unquoted keys in an object string.
+
+        Args:
+            obj_str: The object string to fix
+
+        Returns:
+            The fixed object string with quoted keys
+        """
         if not (obj_str.startswith("{") and obj_str.endswith("}")):
             return obj_str
 
@@ -117,7 +151,15 @@ class QueryPreprocessor:
         return text
 
     def _fix_array_objects(self, arr_str: str) -> str:
-        """Fix objects within an array."""
+        """
+        Fix objects within an array.
+
+        Args:
+            arr_str: The array string to fix
+
+        Returns:
+            The fixed array string with compliant objects
+        """
         if not (arr_str.startswith("[") and arr_str.endswith("]")):
             return arr_str
 
@@ -134,11 +176,21 @@ class QueryPreprocessor:
         )
 
     def _fix_array_part(self, part: str) -> str:
+        """
+        Fix an individual part of an array, which may be an object or a primitive value.
+
+        Args:
+            part: The part of the array to fix
+
+        Returns:
+            The fixed part, with compliant syntax
+        """
         if part.startswith("{") and part.endswith("}"):
             return self._fix_object_keys(part)
         return self._fix_unquoted_keys(part)
 
     def _init_state(self) -> dict[str, int | bool]:
+        """Initialize the state for smart splitting."""
         return {
             "brace_level": 0,
             "bracket_level": 0,
@@ -150,6 +202,13 @@ class QueryPreprocessor:
         """
         Split a string by a delimiter, but only at the top level (not inside nested braces, brackets, or strings).
         This is used to correctly split key-value pairs or array elements in MongoDB-like query syntax.
+
+        Args:
+            text: The text to split
+            delimiter: The delimiter to use for splitting
+
+        Returns:
+            A list of split parts
         """
         return self._split_with_state_tracking(text, delimiter)
 
@@ -157,6 +216,13 @@ class QueryPreprocessor:
         """
         Split the input text by the given delimiter, but only when not inside a string, object, or array.
         Uses a state machine to track nesting and string context.
+
+        Args:
+            text: The text to split
+            delimiter: The delimiter to use for splitting
+
+        Returns:
+            A list of split parts
         """
         parts: list[str] = []
         current_part: str = ""
@@ -184,6 +250,16 @@ class QueryPreprocessor:
         """
         Update the state machine for the current character and determine if a split should occur.
         Returns True if a split was made (i.e., delimiter found at top level), otherwise False.
+
+        Args:
+            char: The current character
+            delimiter: The delimiter for splitting
+            state: The current state of the machine
+            parts: The list of parts already split
+            current_part: The part currently being processed
+
+        Returns:
+            True if a split occurred, otherwise False
         """
         # Handle escape sequences inside strings
         if state["escape_next"]:
@@ -211,6 +287,10 @@ class QueryPreprocessor:
         """
         Update the nesting level counters for braces and brackets.
         Used to track whether we are inside nested objects or arrays.
+
+        Args:
+            char: The character that affects the nesting level
+            state: The current state of the machine
         """
         if char == "{":
             state["brace_level"] = int(state["brace_level"]) + 1
@@ -227,6 +307,14 @@ class QueryPreprocessor:
         """
         Determine if we should split at the current character.
         Only split if the character matches the delimiter and we are not inside a string, object, or array.
+
+        Args:
+            char: The current character
+            delimiter: The delimiter for splitting
+            state: The current state of the machine
+
+        Returns:
+            True if a split should occur, otherwise False
         """
         return (
             char == delimiter
@@ -237,6 +325,16 @@ class QueryPreprocessor:
     def _handle_colon_search_character(
         self, char: str, state: dict[str, int | bool]
     ) -> bool:
+        """
+        Handle character processing for colon search in key-value pairs.
+
+        Args:
+            char: The current character
+            state: The current state of the machine
+
+        Returns:
+            True if the character was handled (i.e., not a split), otherwise False
+        """
         # Handle escape sequences
         if state["escape_next"]:
             state["escape_next"] = False
@@ -253,6 +351,16 @@ class QueryPreprocessor:
         return False
 
     def _is_target_colon(self, char: str, state: dict[str, int | bool]) -> bool:
+        """
+        Check if the current character is a target colon for key-value separation.
+
+        Args:
+            char: The current character
+            state: The current state of the machine
+
+        Returns:
+            True if the character is a target colon, otherwise False
+        """
         return (
             not state["in_string"]
             and char == ":"
@@ -261,6 +369,15 @@ class QueryPreprocessor:
         )
 
     def _fix_key_value_pair(self, pair: str) -> str:
+        """
+        Fix a key-value pair string by ensuring the key is quoted and the value is compliant.
+
+        Args:
+            pair: The key-value pair string to fix
+
+        Returns:
+            The fixed key-value pair string
+        """
         colon_pos = self._find_main_colon(pair)
         if colon_pos == -1:
             return pair
@@ -271,6 +388,15 @@ class QueryPreprocessor:
         return f"{fixed_key}:{fixed_value}"
 
     def _find_main_colon(self, text: str) -> int:
+        """
+        Find the position of the main colon in a key-value pair string.
+
+        Args:
+            text: The text to search for the colon
+
+        Returns:
+            The position of the colon, or -1 if not found
+        """
         state = self._init_state()
         for i, char in enumerate(text):
             if self._update_colon_state(char, state):
@@ -285,7 +411,16 @@ class QueryPreprocessor:
         return -1
 
     def _update_colon_state(self, char: str, state: dict[str, int | bool]) -> bool:
-        """Update state for _find_main_colon and return True if should continue loop."""
+        """
+        Update state for _find_main_colon and return True if should continue loop.
+
+        Args:
+            char: The current character
+            state: The current state of the machine
+
+        Returns:
+            True if the state was updated and the loop should continue, otherwise False
+        """
         if state["escape_next"]:
             state["escape_next"] = False
             return True
@@ -312,6 +447,15 @@ class QueryPreprocessor:
         return False
 
     def _quote_if_needed(self, key: str) -> str:
+        """
+        Quote a key if it is not already quoted and is a valid identifier.
+
+        Args:
+            key: The key to quote
+
+        Returns:
+            The quoted key, or the original key if no quoting was needed
+        """
         key = key.strip()
         # Only quote if not already quoted
         if (key.startswith('"') and key.endswith('"')) or (

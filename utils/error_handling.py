@@ -1,5 +1,7 @@
 """
 Centralized error handling utilities for MongoDB GUI.
+
+This module provides functions and decorators for consistent error handling in both GUI and non-GUI contexts.
 """
 
 import logging

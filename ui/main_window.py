@@ -1,3 +1,11 @@
+"""
+Main application window for the MongoDB GUI.
+"""
+
+# This module defines the MainWindow class and related UI logic for the main application window.
+# All UI logic is separated from business logic and database operations.
+# Use composition and the Observer pattern for state management.
+
 from collections.abc import Callable
 from typing import Any
 
@@ -181,7 +189,12 @@ class MainWindow(QMainWindow, StateObserver):
             self._close_query_tab(index)
 
     def _handle_database_click(self, item_name: str) -> None:
-        """Handles clicks on database items in the collection tree."""
+        """
+        Handle clicks on database items in the collection tree.
+
+        Args:
+            item_name (str): The name of the database item clicked.
+        """
         self.add_query_tab(db_label=item_name, collection_name=None)
 
     def _handle_collection_click(self, item: QTreeWidgetItem) -> None:
@@ -259,7 +272,9 @@ class MainWindow(QMainWindow, StateObserver):
             )
 
     def execute_query(self) -> None:
-        """Delegate query execution to the current QueryTabWidget, or show warning if none selected."""
+        """
+        Delegate query execution to the current QueryTabWidget, or show warning if none selected.
+        """
         current_tab = self.query_tabs.currentWidget()
         if not isinstance(current_tab, QueryTabWidget):
             QMessageBox.warning(self, "Query Error", "No active query tab selected.")
@@ -267,7 +282,9 @@ class MainWindow(QMainWindow, StateObserver):
         current_tab.execute_query()
 
     def display_results(self) -> None:
-        """Display query results in the current tab or fallback to main window table/tree."""
+        """
+        Display query results in the current tab or fallback to main window table/tree.
+        """
         current_tab = self.query_tabs.currentWidget()
         if isinstance(current_tab, QueryTabWidget):
             # QueryTabWidget handles its own display_results
@@ -438,4 +455,5 @@ class MainWindow(QMainWindow, StateObserver):
         # After successful connection:
         # self.set_mongo_client(mongo_client)
         # self.set_active_clients(active_clients)
-        pass
+        pass    # This method is now obsolete after migration to the new state management system and QueryTabWidget-based UI.
+    # Remove or refactor if any legacy code remains.

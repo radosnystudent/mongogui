@@ -1,5 +1,7 @@
 """
 Dialog for editing or creating a collection schema JSON file.
+
+Provides a PyQt5 dialog for editing, validating, and formatting collection schemas.
 """
 
 import json
@@ -20,7 +22,19 @@ from ui.json_highlighter import JsonHighlighter
 
 
 class SchemaEditorDialog(QDialog):
+    """
+    Dialog for editing or creating a collection schema JSON file.
+    Provides validation, formatting, and user feedback for schema editing.
+    """
+
     def __init__(self, parent: QWidget | None = None, initial_schema: str = "") -> None:
+        """
+        Initialize the SchemaEditorDialog.
+
+        Args:
+            parent: Optional parent QWidget.
+            initial_schema: Initial schema JSON as a string.
+        """
         super().__init__(parent)
         self.setWindowTitle("Edit Collection Schema (JSON)")
         self.resize(700, 550)  # Make dialog larger
@@ -52,9 +66,19 @@ class SchemaEditorDialog(QDialog):
         self.validate_json()
 
     def get_schema(self) -> str:
+        """
+        Get the current schema as a string from the text edit widget.
+
+        Returns:
+            The schema as a string.
+        """
         return self.text_edit.toPlainText()
 
     def accept(self) -> None:
+        """
+        Validate the schema JSON and accept the dialog if valid.
+        Shows an error message if the JSON is invalid.
+        """
         try:
             json.loads(self.get_schema())
         except Exception as e:
@@ -63,6 +87,9 @@ class SchemaEditorDialog(QDialog):
         super().accept()
 
     def showEvent(self, a0: QShowEvent | None) -> None:
+        """
+        Format the JSON when the dialog is shown, if possible.
+        """
         try:
             raw = self.text_edit.toPlainText()
             if raw.strip():
@@ -74,6 +101,10 @@ class SchemaEditorDialog(QDialog):
         super().showEvent(a0)
 
     def format_json(self) -> None:
+        """
+        Format the JSON in the text edit widget for readability.
+        Shows an error message if the JSON is invalid.
+        """
         try:
             obj = json.loads(self.text_edit.toPlainText())
             pretty = json.dumps(obj, indent=4, ensure_ascii=False)
@@ -82,6 +113,10 @@ class SchemaEditorDialog(QDialog):
             QMessageBox.critical(self, "Invalid JSON", f"Error: {e}")
 
     def validate_json(self) -> None:
+        """
+        Validate the JSON in the text edit widget.
+        Updates the validation label and enables/disables the save button.
+        """
         try:
             json.loads(self.text_edit.toPlainText())
             self.validation_label.setText("")
