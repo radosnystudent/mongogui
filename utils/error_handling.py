@@ -1,0 +1,63 @@
+"""
+Centralized error handling utilities for MongoDB GUI.
+"""
+from typing import Callable, Any
+from PyQt5.QtWidgets import QMessageBox, QWidget
+import logging
+
+
+def handle_exception(
+    exc: Exception,
+    parent: QWidget | None = None,
+    title: str = "Error",
+    show_messagebox: bool = True,
+    log: bool = True,
+) -> None:
+    """
+    Centralized exception handler for GUI and non-GUI errors.
+
+    Args:
+        exc: The exception instance.
+        parent: Optional QWidget parent for QMessageBox.
+        title: Title for the error dialog.
+        show_messagebox: Whether to show a QMessageBox.
+        log: Whether to log the error.
+    """
+    if log:
+        logging.error(f"{title}: {exc}", exc_info=True)
+    if show_messagebox and parent is not None:
+        QMessageBox.critical(parent, title, str(exc))
+
+
+def _find_qwidget_parent(args: tuple[Any, ...]) -> QWidget | None:
+    """Helper to find a QWidget parent from function arguments."""
+    for arg in args:
+        if hasattr(arg, "parent") and callable(arg.parent):
+            candidate = arg.parent()
+            if isinstance(candidate, QWidget):
+                return candidate
+    return None
+
+
+def error_handling_decorator(
+    title: str = "Error", show_messagebox: bool = True, log: bool = True
+) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """
+    Decorator to wrap functions with centralized error handling.
+    """
+    def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+        def wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as exc:
+                parent = _find_qwidget_parent(args)
+                handle_exception(
+                    exc,
+                    parent=parent,
+                    title=title,
+                    show_messagebox=show_messagebox,
+                    log=log,
+                )
+                return None
+        return wrapper
+    return decorator

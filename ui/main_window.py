@@ -21,13 +21,14 @@ from PyQt5.QtWidgets import (
 from db.connection_manager import ConnectionManager
 from db.mongo_client import MongoClientWrapper
 from db.utils import convert_to_object_id  # Moved import to top
-from ui.collection_panel import CollectionPanelMixin
-from ui.connection_widgets import ConnectionWidgetsMixin
 from ui.constants import EDIT_DOCUMENT_TITLE
 from ui.edit_document_dialog import EditDocumentDialog
 from ui.query_panel import QueryPanelMixin
 from ui.query_tab import QueryTabWidget
 from ui.ui_utils import set_minimum_heights
+from ui.connection_widgets import ConnectionWidgetsMixin
+from ui.collection_panel import CollectionPanelMixin
+from utils.error_handling import handle_exception
 
 bson_dumps: Callable[..., str] | None
 try:
@@ -40,9 +41,7 @@ except ImportError:
 NO_DB_CONNECTION_MSG = "No database connection"
 
 
-class MainWindow(
-    QMainWindow, ConnectionWidgetsMixin, QueryPanelMixin, CollectionPanelMixin
-):
+class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("MongoDB GUI")
@@ -71,6 +70,11 @@ class MainWindow(
         from PyQt5.QtWidgets import QVBoxLayout
 
         self.connection_layout = QVBoxLayout()
+
+        # Composition: instantiate helpers
+        self.connection_widgets = ConnectionWidgetsMixin()
+        self.query_panel = QueryPanelMixin()
+        self.collection_panel = CollectionPanelMixin()
 
         self.setup_ui()
         self.load_connections()
@@ -334,7 +338,6 @@ class MainWindow(
                 self.update_document_in_db(edited_doc)
 
     def update_document_in_db(self, edited_doc: dict) -> None:
-        # Update document in DB using self.mongo_client
         if not self.mongo_client or "_id" not in edited_doc:
             QMessageBox.warning(
                 self,
@@ -343,14 +346,12 @@ class MainWindow(
             )
             return
         try:
-            # Use the current collection (parsed from last_query or last_collection)
             collection = self.last_collection
             if not collection:
                 QMessageBox.warning(
                     self, EDIT_DOCUMENT_TITLE, "Cannot determine collection for update."
                 )
                 return
-            # Convert _id to ObjectId if possible
             edited_doc["_id"] = convert_to_object_id(edited_doc["_id"])
             result = self.mongo_client.update_document(
                 collection, edited_doc["_id"], edited_doc
@@ -359,15 +360,13 @@ class MainWindow(
                 QMessageBox.information(
                     self, EDIT_DOCUMENT_TITLE, "Document updated successfully."
                 )
-                self.execute_query()  # Refresh results
+                self.execute_query()
             else:
                 QMessageBox.warning(
                     self, EDIT_DOCUMENT_TITLE, "Document update failed."
                 )
         except Exception as e:
-            QMessageBox.critical(
-                self, EDIT_DOCUMENT_TITLE, f"Error updating document: {e}"
-            )
+            handle_exception(e, parent=self, title=EDIT_DOCUMENT_TITLE)
 
     def add_tree_item(self, parent: QTreeWidgetItem, data: dict[str, Any]) -> None:
         for key, value in data.items():

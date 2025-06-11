@@ -15,6 +15,7 @@ from PyQt5.QtWidgets import (
     QTreeWidgetItem,
     QWidget,
 )
+from utils.error_handling import handle_exception
 
 from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE, SCHEMA_DIR
 from ui.edit_document_dialog import EditDocumentDialog
@@ -76,6 +77,7 @@ class QueryPanelMixin:
             else:
                 self._set_db_info_label(f"Error: {result}")
         except Exception as e:
+            handle_exception(e, parent=getattr(self, 'parent', None), title="Query Error")
             self._set_db_info_label(f"Query error: {str(e)}")
 
     def _set_db_info_label(self, text: str) -> None:
