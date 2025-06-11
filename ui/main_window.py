@@ -29,6 +29,8 @@ from ui.ui_utils import set_minimum_heights
 from ui.connection_widgets import ConnectionWidgetsMixin
 from ui.collection_panel import CollectionPanelMixin
 from utils.error_handling import handle_exception
+from utils.state_manager import StateManager, StateObserver
+
 
 bson_dumps: Callable[..., str] | None
 try:
@@ -41,7 +43,7 @@ except ImportError:
 NO_DB_CONNECTION_MSG = "No database connection"
 
 
-class MainWindow(QMainWindow):
+class MainWindow(QMainWindow, StateObserver):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("MongoDB GUI")
@@ -50,9 +52,12 @@ class MainWindow(QMainWindow):
 
         # Instantiate ConnectionManager
         self.conn_manager = ConnectionManager()
+        self.state_manager = StateManager()
+        self.state_manager.subscribe(self)
+        self._active_clients: dict[str, Any] = {}
+        self._mongo_client: Any = None
 
         # Initialize components
-        self.mongo_client: MongoClientWrapper | None = None
         self.current_connection: dict[str, Any] | None = None
         self.current_page = 0
         self.page_size = 50
@@ -408,3 +413,31 @@ class MainWindow(QMainWindow):
         dlg.exec_()
         # Optionally: reload connections if changed
         self.load_connections()
+
+    def on_state_update(self, state: dict[str, Any]) -> None:
+        """React to state changes (Observer pattern)."""
+        self._mongo_client = state.get("mongo_client", self._mongo_client)
+        self._active_clients = state.get("active_clients", self._active_clients)
+        # Optionally update UI or internal references
+
+    def set_mongo_client(self, mongo_client: Any) -> None:
+        self._mongo_client = mongo_client
+        self.state_manager.set("mongo_client", mongo_client)
+
+    def get_mongo_client(self) -> Any:
+        return self.state_manager.get("mongo_client", self._mongo_client)
+
+    def set_active_clients(self, active_clients: dict[str, Any]) -> None:
+        self._active_clients = active_clients
+        self.state_manager.set("active_clients", active_clients)
+
+    def get_active_clients(self) -> dict[str, Any]:
+        return self.state_manager.get("active_clients", self._active_clients)
+
+    # Example usage in methods:
+    def connect_to_database(self, connection_name: str) -> None:
+        # ...existing connection logic...
+        # After successful connection:
+        # self.set_mongo_client(mongo_client)
+        # self.set_active_clients(active_clients)
+        pass
