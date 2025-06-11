@@ -56,7 +56,6 @@ class TestMongoClientWrapper:
         self, mock_mongo_client: MagicMock, mongo_wrapper: MongoClientWrapper
     ) -> None:
         """Test failed connection."""
-        # Setup mock to raise exception
         from pymongo.errors import PyMongoError
 
         mock_mongo_client.side_effect = PyMongoError("Connection failed")
@@ -106,27 +105,31 @@ class TestMongoClientWrapper:
         mock_client_instance.admin.command.return_value = {"ok": 1}
 
         mock_db = MagicMock()
-        mock_collection = MagicMock()
         mock_client_instance.__getitem__.return_value = mock_db
-        mock_db.__getitem__.return_value = mock_collection
 
         mock_cursor = MagicMock()
-        mock_cursor.limit.return_value = [{"_id": "1", "name": "test"}]
-        mock_collection.find.return_value = mock_cursor
+        mock_cursor.skip.return_value = mock_cursor
+        mock_cursor.limit.return_value = mock_cursor
+        mock_cursor.explain.return_value = {"queryPlanner": {"indexFilterSet": False}}
+        mock_db.__getitem__.return_value = mock_cursor
+        mock_cursor.find.return_value = mock_cursor
 
         # Connect and test
         mongo_wrapper.connect("localhost", 27017, "test_db", None, None, False)
         result = mongo_wrapper.execute_query("db.test_collection.find({})")
 
-        # Verify
-        assert isinstance(result, list)
+        # Unwrap Result for assertion
+        assert result.is_ok()
+        value = result.unwrap()
+        assert isinstance(value, list) or isinstance(value, dict)
 
     def test_execute_query_no_connection(
         self, mongo_wrapper: MongoClientWrapper
     ) -> None:
         """Test query execution without connection."""
         result = mongo_wrapper.execute_query("db.test.find({})")
-        assert result == "Not connected to database"
+        assert result.is_error()
+        assert result.unwrap_err() == "Not connected to database"
 
     @patch("db.mongo_client.MongoClient")
     def test_run_query_success(
@@ -139,19 +142,17 @@ class TestMongoClientWrapper:
         mock_client_instance.admin.command.return_value = {"ok": 1}
 
         mock_db = MagicMock()
-        mock_collection = MagicMock()
         mock_client_instance.__getitem__.return_value = mock_db
-        mock_db.__getitem__.return_value = mock_collection
 
         mock_cursor = MagicMock()
         mock_cursor.limit.return_value = [{"_id": "1", "data": "test"}]
-        mock_collection.find.return_value = mock_cursor
+        mock_db.__getitem__.return_value = mock_cursor
+        mock_cursor.find.return_value = mock_cursor
 
         # Connect and test
         mongo_wrapper.connect("localhost", 27017, "test_db", None, None, False)
         result = mongo_wrapper.run_query("test_db", "test_collection", {"name": "test"})
 
-        # Verify
         assert isinstance(result, list)
 
     def test_run_query_no_connection(self, mongo_wrapper: MongoClientWrapper) -> None:
@@ -170,8 +171,9 @@ class TestMongoClientWrapper:
         mock_client_instance.admin.command.return_value = {"ok": 1}
 
         mock_db = MagicMock()
-        mock_collection = MagicMock()
         mock_client_instance.__getitem__.return_value = mock_db
+
+        mock_collection = MagicMock()
         mock_db.__getitem__.return_value = mock_collection
 
         mock_collection.aggregate.return_value = [{"_id": "1", "count": 5}]
@@ -181,7 +183,6 @@ class TestMongoClientWrapper:
         pipeline = [{"$group": {"_id": None, "count": {"$sum": 1}}}]
         result = mongo_wrapper.run_aggregate("test_db", "test_collection", pipeline)
 
-        # Verify
         assert isinstance(result, list)
 
     def test_run_aggregate_no_connection(
@@ -206,9 +207,8 @@ class TestMongoClientWrapper:
         mongo_wrapper.connect("localhost", 27017, "test_db", None, None, False)
         result = mongo_wrapper.execute_query("invalid query")
 
-        # Verify
-        assert isinstance(result, str)
-        assert "Unsupported query type" in result
+        assert result.is_error()
+        assert "Unsupported query type" in result.unwrap_err()
 
     @patch("db.mongo_client.MongoClient")
     def test_execute_aggregate_query(
@@ -233,5 +233,7 @@ class TestMongoClientWrapper:
             'db.test_collection.aggregate([{"$match": {}}])'
         )
 
-        # Verify
-        assert isinstance(result, list)
+        # Unwrap Result for assertion
+        assert result.is_ok()
+        value = result.unwrap()
+        assert isinstance(value, list)

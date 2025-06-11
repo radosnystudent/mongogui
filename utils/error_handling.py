@@ -52,7 +52,7 @@ def error_handling_decorator(
     """
 
     def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-        def wrapper(*args, **kwargs):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
             try:
                 return func(*args, **kwargs)
             except Exception as exc:
@@ -69,3 +69,10 @@ def error_handling_decorator(
         return wrapper
 
     return decorator
+
+
+# This file should only be imported as a module, not run as a script.
+if __name__ == "__main__":
+    raise RuntimeError(
+        "utils/error_handling.py is a module and should not be run as a script."
+    )

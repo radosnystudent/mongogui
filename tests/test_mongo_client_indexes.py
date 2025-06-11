@@ -27,10 +27,14 @@ def test_index_lifecycle(mongo_client: MongoClientWrapper) -> None:
     try:
         # Create index
         keys = [("field1", 1), ("field2", -1)]
-        name = mongo_client.create_index(col, keys, name="myidx", unique=True)
+        name_result = mongo_client.create_index(col, keys, name="myidx", unique=True)
+        assert not isinstance(name_result, str) and name_result.is_ok()
+        name = name_result.unwrap()
         assert isinstance(name, str)
         # List indexes
-        indexes = mongo_client.list_indexes(col)
+        indexes_result = mongo_client.list_indexes(col)
+        assert not isinstance(indexes_result, str) and indexes_result.is_ok()
+        indexes = indexes_result.unwrap()
         assert isinstance(indexes, list)
         assert any(
             isinstance(idx, dict) and idx.get("name") == "myidx" for idx in indexes
@@ -39,19 +43,26 @@ def test_index_lifecycle(mongo_client: MongoClientWrapper) -> None:
         update_result = mongo_client.update_index(
             col, "myidx", [("field1", 1)], unique=False
         )
-        assert isinstance(update_result, str)
-        indexes2 = mongo_client.list_indexes(col)
+        if isinstance(update_result, str):
+            update_name = update_result
+        else:
+            assert update_result.is_ok()
+            update_name = update_result.unwrap()
+        assert isinstance(update_name, str)
+        indexes2_result = mongo_client.list_indexes(col)
+        assert not isinstance(indexes2_result, str) and indexes2_result.is_ok()
+        indexes2 = indexes2_result.unwrap()
         assert any(
-            isinstance(idx, dict) and idx.get("name") == update_result
-            for idx in indexes2
+            isinstance(idx, dict) and idx.get("name") == update_name for idx in indexes2
         )
         # Drop index
-        drop_result = mongo_client.drop_index(col, update_result)
+        drop_result = mongo_client.drop_index(col, update_name)
         assert drop_result is True
-        indexes3 = mongo_client.list_indexes(col)
+        indexes3_result = mongo_client.list_indexes(col)
+        assert not isinstance(indexes3_result, str) and indexes3_result.is_ok()
+        indexes3 = indexes3_result.unwrap()
         assert not any(
-            isinstance(idx, dict) and idx.get("name") == update_result
-            for idx in indexes3
+            isinstance(idx, dict) and idx.get("name") == update_name for idx in indexes3
         )
     finally:
         db.drop_collection(col)

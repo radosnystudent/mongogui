@@ -17,14 +17,14 @@ from db.result import Result
 from db.utils import convert_to_object_id
 
 
-def require_connection(method):
+def require_connection(method: Any) -> Any:
     """
     Decorator to ensure MongoClientWrapper has an active connection before proceeding.
     Returns a Result error if not connected.
     """
 
     @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         if self.client is None:
             return Result.Err(NOT_CONNECTED_MSG)
         return method(self, *args, **kwargs)
@@ -32,14 +32,14 @@ def require_connection(method):
     return wrapper
 
 
-def require_connection_result(method):
+def require_connection_result(method: Any) -> Any:
     """
     Decorator to ensure MongoClientWrapper has an active connection and database before proceeding.
     Returns a Result error if not connected.
     """
 
     @functools.wraps(method)
-    def wrapper(self, *args, **kwargs):
+    def wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
         if self.client is None or not self.current_db:
             return Result.Err(NOT_CONNECTED_MSG)
         return method(self, *args, **kwargs)
@@ -95,6 +95,8 @@ class MongoClientWrapper:
 
             self.client = MongoClient(uri, **options)
             self.current_db = db
+            # Explicitly ping the server to verify connection (for test expectations)
+            self.client.admin.command("ping")
             return True
         except PyMongoError:
             return False
@@ -354,7 +356,8 @@ class MongoClientWrapper:
         try:
             db = client[dbname]
             collection = db[collection_name]
-            indexes = list(collection.list_indexes())
+            # Cast to list[dict[str, Any]] for mypy compatibility
+            indexes = [dict(idx) for idx in collection.list_indexes()]
             return Result.Ok(indexes)
         except Exception as e:
             return Result.Err(f"List indexes error: {str(e)}")

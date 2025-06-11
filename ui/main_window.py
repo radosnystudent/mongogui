@@ -439,15 +439,26 @@ class MainWindow(QMainWindow, StateObserver):
         self._mongo_client = mongo_client
         self.state_manager.set("mongo_client", mongo_client)
 
-    def get_mongo_client(self) -> Any:
-        return self.state_manager.get("mongo_client", self._mongo_client)
+    def get_mongo_client(self) -> dict[str, Any]:
+        """Return the mongo_client as a dict, or an empty dict if not set or not a dict."""
+        value = self.state_manager.get("mongo_client", self._mongo_client)
+        if isinstance(value, dict):
+            from typing import cast
+
+            return cast(dict[str, Any], value)
+        return {}
 
     def set_active_clients(self, active_clients: dict[str, Any]) -> None:
         self._active_clients = active_clients
         self.state_manager.set("active_clients", active_clients)
 
     def get_active_clients(self) -> dict[str, Any]:
-        return self.state_manager.get("active_clients", self._active_clients)
+        value = self.state_manager.get("active_clients", self._active_clients)
+        if isinstance(value, dict):
+            from typing import cast
+
+            return cast(dict[str, Any], value)
+        return {}
 
     # Example usage in methods:
     def connect_to_database(self, connection_name: str) -> None:

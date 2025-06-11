@@ -24,19 +24,14 @@ def detect_platform() -> str:
         return "unknown"
 
 
-def run_command(command: list[str] | str, shell: bool = False) -> bool:
-    """Run a command and return success status. Avoid shell=True unless absolutely necessary."""
-    import shlex
-
+def run_command(command: list[str], shell: bool = False) -> bool:
+    """Run a command and return success status. Only supports list[str] for command."""
     if shell:
-        # SECURITY: Avoid shell=True unless absolutely necessary and only for static, trusted commands.
-        if not isinstance(command, str):
-            raise ValueError("When using shell=True, command must be a static string.")
-        cmd = shlex.split(command)
-    else:
-        cmd = command
+        raise ValueError(
+            "shell=True is not supported for run_command in this launcher."
+        )
     try:
-        result = subprocess.run(cmd, shell=shell, check=True)
+        result = subprocess.run(command, shell=False, check=True)
         return result.returncode == 0
     except subprocess.CalledProcessError:
         return False
