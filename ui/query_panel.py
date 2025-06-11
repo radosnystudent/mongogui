@@ -64,18 +64,17 @@ class QueryPanelMixin:
             self._set_db_info_label("Please enter a query")
             return
         try:
-            # Use server-side pagination
             result = self.mongo_client.execute_query(
                 query_text,
                 page=self.current_page,
                 page_size=self.page_size,
             )
-            if isinstance(result, list):
-                self.results = result
+            if result.is_ok:
+                self.results = result.unwrap()
                 self.last_query = query_text
                 self.display_results()
             else:
-                self._set_db_info_label(f"Error: {result}")
+                self._set_db_info_label(f"Error: {result.unwrap_err()}")
         except Exception as e:
             handle_exception(
                 e, parent=getattr(self, "parent", None), title="Query Error"

@@ -12,6 +12,7 @@ from db.constants import (
     SKIP_STAGE,
 )
 from db.query_preprocessor import query_preprocessor
+from db.result import Result
 from db.utils import convert_to_object_id
 
 
@@ -59,25 +60,27 @@ class MongoClientWrapper:
 
     def execute_query(
         self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
-    ) -> list[dict[str, Any]] | dict[str, Any] | str:
+    ) -> Result[list[dict[str, Any]] | dict[str, Any], str]:
         """Execute a MongoDB query from text and return results. Supports server-side pagination."""
         if self.client is None:
-            return NOT_CONNECTED_MSG
-
+            return Result.Err(NOT_CONNECTED_MSG)
         try:
             preprocessed_query = query_preprocessor.preprocess_query(query_text)
             if "find(" in preprocessed_query:
-                return self._execute_find_query(
+                result = self._execute_find_query(
                     preprocessed_query, page=page, page_size=page_size, explain=explain
                 )
             elif "aggregate(" in preprocessed_query:
-                return self._execute_aggregate_query(
+                result = self._execute_aggregate_query(
                     preprocessed_query, page=page, page_size=page_size, explain=explain
                 )
             else:
-                return "Unsupported query type"
+                return Result.Err("Unsupported query type")
+            if isinstance(result, str):
+                return Result.Err(result)
+            return Result.Ok(result)
         except Exception as e:
-            return f"Query execution error: {str(e)}"
+            return Result.Err(f"Query execution error: {str(e)}")
 
     def _execute_find_query(
         self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
@@ -206,31 +209,31 @@ class MongoClientWrapper:
         except Exception:
             return False
 
-    def list_indexes(self, collection_name: str) -> list[dict[str, Any]] | str:
+    def list_indexes(self, collection_name: str) -> Result[list[dict[str, Any]], str]:
         """List all indexes for a collection."""
         if self.client is None:
-            return NOT_CONNECTED_MSG
+            return Result.Err(NOT_CONNECTED_MSG)
         try:
             db = self.client[self.current_db]
             collection = db[collection_name]
-            # Convert each index info to dict explicitly
-            return [dict(idx) for idx in collection.list_indexes()]
+            indexes = list(collection.list_indexes())
+            return Result.Ok(indexes)
         except Exception as e:
-            return f"List indexes error: {str(e)}"
+            return Result.Err(f"List indexes error: {str(e)}")
 
     def create_index(
-        self, collection_name: str, keys: list[Any], **kwargs: Any
-    ) -> str | Any:
+        self, collection_name: str, keys: Any, **kwargs: Any
+    ) -> Result[str, str]:
         """Create an index on a collection. Keys is a list of (field, direction) tuples."""
         if self.client is None:
-            return NOT_CONNECTED_MSG
+            return Result.Err(NOT_CONNECTED_MSG)
         try:
             db = self.client[self.current_db]
             collection = db[collection_name]
-            name = collection.create_index(keys, **kwargs)
-            return name
+            index_name = collection.create_index(keys, **kwargs)
+            return Result.Ok(index_name)
         except Exception as e:
-            return f"Create index error: {str(e)}"
+            return Result.Err(f"Create index error: {str(e)}")
 
     def drop_index(self, collection_name: str, index_name: str) -> bool | str:
         """Drop an index by name from a collection."""
