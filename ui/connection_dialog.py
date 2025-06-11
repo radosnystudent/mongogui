@@ -2,13 +2,12 @@
 from PyQt5.QtWidgets import (
     QCheckBox,
     QDialog,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
     QPushButton,
-    QVBoxLayout,
     QWidget,
 )
+
 from ui.ui_utils import setup_dialog_layout
 
 

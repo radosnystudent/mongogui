@@ -3,12 +3,12 @@ MongoDB connection manager for handling connection profiles and secure credentia
 """
 
 import json
+import logging
 import os
 from typing import Any
 
 import keyring
-from keyring.errors import PasswordDeleteError, KeyringError
-import logging
+from keyring.errors import KeyringError, PasswordDeleteError
 
 
 class ConnectionManager:
@@ -44,7 +44,9 @@ class ConnectionManager:
             keyring.delete_password(self.keyring_service, test_key)
         except Exception as e:
             logging.warning(f"Keyring storage verification failed: {e}")
-            raise RuntimeError("Secure credential storage (keyring) is not available or not working.")
+            raise RuntimeError(
+                "Secure credential storage (keyring) is not available or not working."
+            )
 
     def add_connection(
         self,

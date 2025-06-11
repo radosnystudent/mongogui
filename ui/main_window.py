@@ -455,5 +455,6 @@ class MainWindow(QMainWindow, StateObserver):
         # After successful connection:
         # self.set_mongo_client(mongo_client)
         # self.set_active_clients(active_clients)
-        pass    # This method is now obsolete after migration to the new state management system and QueryTabWidget-based UI.
+        pass  # This method is now obsolete after migration to the new state management system and QueryTabWidget-based UI.
+
     # Remove or refactor if any legacy code remains.

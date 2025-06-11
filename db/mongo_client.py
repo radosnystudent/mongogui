@@ -1,3 +1,4 @@
+import functools
 import json
 import re
 from typing import Any
@@ -14,6 +15,36 @@ from db.constants import (
 from db.query_preprocessor import query_preprocessor
 from db.result import Result
 from db.utils import convert_to_object_id
+
+
+def require_connection(method):
+    """
+    Decorator to ensure MongoClientWrapper has an active connection before proceeding.
+    Returns a Result error if not connected.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if self.client is None:
+            return Result.Err(NOT_CONNECTED_MSG)
+        return method(self, *args, **kwargs)
+
+    return wrapper
+
+
+def require_connection_result(method):
+    """
+    Decorator to ensure MongoClientWrapper has an active connection and database before proceeding.
+    Returns a Result error if not connected.
+    """
+
+    @functools.wraps(method)
+    def wrapper(self, *args, **kwargs):
+        if self.client is None or not self.current_db:
+            return Result.Err(NOT_CONNECTED_MSG)
+        return method(self, *args, **kwargs)
+
+    return wrapper
 
 
 class MongoClientWrapper:
@@ -68,6 +99,10 @@ class MongoClientWrapper:
         except PyMongoError:
             return False
 
+    def _require_connection(self) -> bool:
+        """Return True if connected and current_db is set, else False."""
+        return self.client is not None and bool(self.current_db)
+
     def list_collections(self) -> list[str]:
         """
         List all collections in the current database.
@@ -75,15 +110,19 @@ class MongoClientWrapper:
         Returns:
             List of collection names, or empty list if not connected or error occurs.
         """
-        if self.client is None:
+        if not self._require_connection():
             return []
-
+        client = self.client
+        dbname = self.current_db
+        if client is None or not dbname:
+            return []
         try:
-            db = self.client[self.current_db]
+            db = client[dbname]
             return db.list_collection_names()
         except Exception:
             return []
 
+    @require_connection_result
     def execute_query(
         self, query_text: str, page: int = 0, page_size: int = 50, explain: bool = False
     ) -> Result[list[dict[str, Any]] | dict[str, Any], str]:
@@ -98,8 +137,6 @@ class MongoClientWrapper:
         Returns:
             Result object containing query results or error message.
         """
-        if self.client is None:
-            return Result.Err(NOT_CONNECTED_MSG)
         try:
             preprocessed_query = query_preprocessor.preprocess_query(query_text)
             if "find(" in preprocessed_query:
@@ -132,6 +169,12 @@ class MongoClientWrapper:
         Returns:
             List of documents, explain output, or error message string.
         """
+        if not self._require_connection():
+            return NOT_CONNECTED_MSG
+        client = self.client
+        dbname = self.current_db
+        if client is None or not dbname:
+            return NOT_CONNECTED_MSG
         try:
             pattern = r"db\.(\w+)\.find\((.*)\)"
             match = re.search(pattern, query_text)
@@ -143,21 +186,17 @@ class MongoClientWrapper:
                 query_dict = {}
             else:
                 query_dict = json.loads(query_part)
-            # Only apply skip/limit if not already present in the query dict
-            if self.client is not None:
-                db = self.client[self.current_db]
-                collection = db[collection_name]
-                cursor = collection.find(query_dict)
-                if not (SKIP_STAGE in query_dict or LIMIT_STAGE in query_dict):
-                    cursor = cursor.skip(page * page_size).limit(page_size)
-                if explain:
-                    plan = cursor.explain()
-                    return plan
-                else:
-                    results = list(cursor)
-                    return results
+            db = client[dbname]
+            collection = db[collection_name]
+            cursor = collection.find(query_dict)
+            if not (SKIP_STAGE in query_dict or LIMIT_STAGE in query_dict):
+                cursor = cursor.skip(page * page_size).limit(page_size)
+            if explain:
+                plan = cursor.explain()
+                return plan
             else:
-                return NOT_CONNECTED_MSG
+                results = list(cursor)
+                return results
         except Exception as e:
             return f"Find query error: {str(e)}"
 
@@ -175,6 +214,12 @@ class MongoClientWrapper:
         Returns:
             List of documents, explain output, or error message string.
         """
+        if not self._require_connection():
+            return NOT_CONNECTED_MSG
+        client = self.client
+        dbname = self.current_db
+        if client is None or not dbname:
+            return NOT_CONNECTED_MSG
         try:
             pattern = r"db\.(\w+)\.aggregate\((.*)\)"
             match = re.search(pattern, query_text)
@@ -185,7 +230,6 @@ class MongoClientWrapper:
             pipeline = json.loads(pipeline_part)
             if not isinstance(pipeline, list):
                 return "Pipeline must be a list"
-            # Only append $skip/$limit if not already present
             has_skip = any(
                 isinstance(stage, dict) and SKIP_STAGE in stage for stage in pipeline
             )
@@ -197,24 +241,21 @@ class MongoClientWrapper:
                 paginated_pipeline.append({SKIP_STAGE: page * page_size})
             if not has_limit:
                 paginated_pipeline.append({LIMIT_STAGE: page_size})
-            if self.client is not None:
-                db = self.client[self.current_db]
-                collection = db[collection_name]
-                if explain:
-                    plan = db.command(
-                        "explain",
-                        {
-                            "aggregate": collection_name,
-                            "pipeline": paginated_pipeline,
-                            "cursor": {"batchSize": page_size},
-                        },
-                    )
-                    return plan
-                else:
-                    results = list(collection.aggregate(paginated_pipeline))
-                    return results
+            db = client[dbname]
+            collection = db[collection_name]
+            if explain:
+                plan = db.command(
+                    "explain",
+                    {
+                        "aggregate": collection_name,
+                        "pipeline": paginated_pipeline,
+                        "cursor": {"batchSize": page_size},
+                    },
+                )
+                return plan
             else:
-                return NOT_CONNECTED_MSG
+                results = list(collection.aggregate(paginated_pipeline))
+                return results
         except Exception as e:
             return f"Aggregate query error: {str(e)}"
 
@@ -231,11 +272,11 @@ class MongoClientWrapper:
         Returns:
             List of matching documents, or error message string.
         """
+        client = self.client
+        if client is None or not db_name:
+            return NOT_CONNECTED_MSG
         try:
-            if self.client is None:
-                return NOT_CONNECTED_MSG
-
-            db = self.client[db_name]
+            db = client[db_name]
             collection = db[collection_name]
             results = list(collection.find(query_dict).limit(MAX_QUERY_LIMIT))
             return results
@@ -255,11 +296,11 @@ class MongoClientWrapper:
         Returns:
             List of documents resulting from the aggregation, or error message string.
         """
+        client = self.client
+        if client is None or not db_name:
+            return NOT_CONNECTED_MSG
         try:
-            if self.client is None:
-                return NOT_CONNECTED_MSG
-
-            db = self.client[db_name]
+            db = client[db_name]
             collection = db[collection_name]
             results = list(collection.aggregate(pipeline))
             return results
@@ -279,19 +320,22 @@ class MongoClientWrapper:
         Returns:
             True if the document was updated, False otherwise.
         """
-        if self.client is None:
+        if not self._require_connection():
+            return False
+        client = self.client
+        dbname = self.current_db
+        if client is None or not dbname:
             return False
         try:
-            db = self.client[self.current_db]
+            db = client[dbname]
             collection = db[collection_name]
-
-            # Convert doc_id to ObjectId if possible
             doc_id = convert_to_object_id(doc_id)
             result = collection.replace_one({"_id": doc_id}, new_doc)
             return result.modified_count > 0
         except Exception:
             return False
 
+    @require_connection
     def list_indexes(self, collection_name: str) -> Result[list[dict[str, Any]], str]:
         """
         List all indexes for a collection.
@@ -301,16 +345,21 @@ class MongoClientWrapper:
         Returns:
             Result object containing a list of indexes or error message.
         """
-        if self.client is None:
+        if not self._require_connection():
+            return Result.Err(NOT_CONNECTED_MSG)
+        client = self.client
+        dbname = self.current_db
+        if client is None or not dbname:
             return Result.Err(NOT_CONNECTED_MSG)
         try:
-            db = self.client[self.current_db]
+            db = client[dbname]
             collection = db[collection_name]
             indexes = list(collection.list_indexes())
             return Result.Ok(indexes)
         except Exception as e:
             return Result.Err(f"List indexes error: {str(e)}")
 
+    @require_connection
     def create_index(
         self, collection_name: str, keys: Any, **kwargs: Any
     ) -> Result[str, str]:
@@ -324,16 +373,21 @@ class MongoClientWrapper:
         Returns:
             Result object containing the index name or error message.
         """
-        if self.client is None:
+        if not self._require_connection():
+            return Result.Err(NOT_CONNECTED_MSG)
+        client = self.client
+        dbname = self.current_db
+        if client is None or not dbname:
             return Result.Err(NOT_CONNECTED_MSG)
         try:
-            db = self.client[self.current_db]
+            db = client[dbname]
             collection = db[collection_name]
             index_name = collection.create_index(keys, **kwargs)
             return Result.Ok(index_name)
         except Exception as e:
             return Result.Err(f"Create index error: {str(e)}")
 
+    @require_connection
     def drop_index(self, collection_name: str, index_name: str) -> bool | str:
         """
         Drop an index by name from a collection.
@@ -344,16 +398,21 @@ class MongoClientWrapper:
         Returns:
             True if the index was dropped, error message string otherwise.
         """
-        if self.client is None:
-            return NOT_CONNECTED_MSG
+        if not self._require_connection():
+            return f"Drop index error: {NOT_CONNECTED_MSG}"
+        client = self.client
+        dbname = self.current_db
+        if client is None or not dbname:
+            return f"Drop index error: {NOT_CONNECTED_MSG}"
         try:
-            db = self.client[self.current_db]
+            db = client[dbname]
             collection = db[collection_name]
             collection.drop_index(index_name)
             return True
         except Exception as e:
             return f"Drop index error: {str(e)}"
 
+    @require_connection
     def update_index(
         self, collection_name: str, index_name: str, keys: list[Any], **kwargs: Any
     ) -> str | Any:

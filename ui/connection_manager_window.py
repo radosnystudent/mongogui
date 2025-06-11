@@ -6,13 +6,11 @@ from PyQt5.QtWidgets import (
     QAction,
     QDialog,
     QFileDialog,
-    QHBoxLayout,
     QMessageBox,
     QPushButton,
     QToolBar,
     QTreeWidget,
     QTreeWidgetItem,
-    QVBoxLayout,
     QWidget,  # Add QWidget for type annotation
 )
 

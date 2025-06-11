@@ -4,7 +4,7 @@ Result pattern for consistent return types in database operations.
 This module defines a generic Result class for use in database and UI operations, following the Result pattern.
 """
 
-from typing import Generic, TypeVar, Optional
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 E = TypeVar("E")
@@ -19,7 +19,7 @@ class Result(Generic[T, E]):
         error (Optional[E]): The error returned on failure.
     """
 
-    def __init__(self, value: Optional[T] = None, error: Optional[E] = None) -> None:
+    def __init__(self, value: T | None = None, error: E | None = None) -> None:
         """
         Initialize a Result object.
 

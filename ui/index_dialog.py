@@ -13,9 +13,9 @@ from PyQt5.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
-    QTextEdit,
 )
 
 from ui.ui_utils import setup_dialog_layout
@@ -203,7 +203,12 @@ class IndexEditDialog(QDialog):
         self.background_checkbox = QCheckBox("Create in background", self)
         self.save_btn = QPushButton(SAVE_LABEL)
         self.cancel_btn = QPushButton(CANCEL_LABEL)
-        widgets: list[QWidget] = [QLabel("Index name:"), self.name_edit, self.tabs, self.background_checkbox]
+        widgets: list[QWidget] = [
+            QLabel("Index name:"),
+            self.name_edit,
+            self.tabs,
+            self.background_checkbox,
+        ]
         button_widgets: list[QWidget] = [self.save_btn, self.cancel_btn]
         setup_dialog_layout(self, widgets, button_widgets)
         self.save_btn.clicked.connect(self.accept)

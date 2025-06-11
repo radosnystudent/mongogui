@@ -1,6 +1,7 @@
 """
 Utility functions for MongoDB database operations.
 """
+
 # This module contains helper functions for database operations.
 # Add new utility functions as needed for MongoDB queries, validation, or formatting.
 

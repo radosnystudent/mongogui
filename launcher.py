@@ -27,6 +27,7 @@ def detect_platform() -> str:
 def run_command(command: list[str] | str, shell: bool = False) -> bool:
     """Run a command and return success status. Avoid shell=True unless absolutely necessary."""
     import shlex
+
     if shell:
         # SECURITY: Avoid shell=True unless absolutely necessary and only for static, trusted commands.
         if not isinstance(command, str):

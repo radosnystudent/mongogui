@@ -51,7 +51,11 @@ class EditDocumentDialog(QDialog):
         self.save_btn = QPushButton("Save")
         self.cancel_btn = QPushButton("Cancel")
         widgets = [self.text_edit, self.validation_label]
-        button_widgets: list[QWidget] = [self.format_btn, self.save_btn, self.cancel_btn]
+        button_widgets: list[QWidget] = [
+            self.format_btn,
+            self.save_btn,
+            self.cancel_btn,
+        ]
         setup_dialog_layout(self, widgets, button_widgets)
 
         self.format_btn.clicked.connect(self.format_json)

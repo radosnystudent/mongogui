@@ -1,11 +1,8 @@
 from PyQt5.QtWidgets import (
-    QVBoxLayout,
-    QHBoxLayout,
-    QWidget,
-    QLayout,
     QDialog,
-    QPushButton,
-    QLabel,
+    QHBoxLayout,
+    QVBoxLayout,
+    QWidget,
 )
 
 
@@ -57,5 +54,7 @@ def setup_dialog_layout(
         if isinstance(layout, QVBoxLayout):
             layout.addLayout(btn_layout)
         else:
-            raise TypeError("setup_dialog_layout requires main layout to be QVBoxLayout if using button_widgets.")
+            raise TypeError(
+                "setup_dialog_layout requires main layout to be QVBoxLayout if using button_widgets."
+            )
     dialog.setLayout(layout)
