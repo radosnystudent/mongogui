@@ -3,6 +3,7 @@ from typing import Any
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 
+from db.constants import LIMIT_STAGE, SKIP_STAGE
 from db.query_preprocessor import query_preprocessor
 from db.utils import convert_to_object_id
 
@@ -78,6 +79,7 @@ class MongoClientWrapper:
     ) -> list[dict[str, Any]] | dict[str, Any] | str:
         """Execute a find query with server-side pagination."""
         try:
+            import json
             import re
 
             pattern = r"db\.(\w+)\.find\((.*)\)"
@@ -89,15 +91,14 @@ class MongoClientWrapper:
             if query_part == "{}" or query_part == "":
                 query_dict = {}
             else:
-                import json
-
                 query_dict = json.loads(query_part)
+            # Only apply skip/limit if not already present in the query dict
             if self.client is not None:
                 db = self.client[self.current_db]
                 collection = db[collection_name]
-                cursor = (
-                    collection.find(query_dict).skip(page * page_size).limit(page_size)
-                )
+                cursor = collection.find(query_dict)
+                if not (SKIP_STAGE in query_dict or LIMIT_STAGE in query_dict):
+                    cursor = cursor.skip(page * page_size).limit(page_size)
                 if explain:
                     plan = cursor.explain()
                     return plan
@@ -125,13 +126,23 @@ class MongoClientWrapper:
             import json
 
             pipeline = json.loads(pipeline_part)
+            if not isinstance(pipeline, list):
+                return "Pipeline must be a list"
+            # Only append $skip/$limit if not already present
+            has_skip = any(
+                isinstance(stage, dict) and SKIP_STAGE in stage for stage in pipeline
+            )
+            has_limit = any(
+                isinstance(stage, dict) and LIMIT_STAGE in stage for stage in pipeline
+            )
+            paginated_pipeline = list(pipeline)
+            if not has_skip:
+                paginated_pipeline.append({SKIP_STAGE: page * page_size})
+            if not has_limit:
+                paginated_pipeline.append({LIMIT_STAGE: page_size})
             if self.client is not None:
                 db = self.client[self.current_db]
                 collection = db[collection_name]
-                # Add $skip and $limit for pagination if not present
-                paginated_pipeline = list(pipeline)
-                paginated_pipeline.append({"$skip": page * page_size})
-                paginated_pipeline.append({"$limit": page_size})
                 if explain:
                     plan = db.command(
                         "explain",
