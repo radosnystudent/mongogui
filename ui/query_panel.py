@@ -415,7 +415,7 @@ class QueryPanelMixin:
 
     def _create_summary_widget(self, result: Any) -> None:
         """Create and display the query summary widget."""
-        from PyQt5.QtWidgets import (  # QSplitter already imported at module level
+        from PyQt5.QtWidgets import (
             QLabel,
             QVBoxLayout,
             QWidget,
@@ -423,16 +423,18 @@ class QueryPanelMixin:
 
         summary_text = self._build_explain_summary(result)
         if not summary_text:
-            return
+            summary_text = "<i>No summary available for this query plan.</i>"
 
-        # The parent of json_tree is the QSplitter in QueryTabWidget
+        # Try to find the QSplitter ancestor, not just immediate parent
         splitter_widget = self.json_tree.parentWidget()
-        if not splitter_widget:  # Should ideally not happen
-            # Log or handle error: cannot create summary widget without a parent splitter
-            return
+        while splitter_widget and not isinstance(splitter_widget, QSplitter):
+            splitter_widget = splitter_widget.parentWidget()
+        if not splitter_widget:
+            # fallback: use immediate parent
+            splitter_widget = self.json_tree.parentWidget()
+            if not splitter_widget:
+                return
 
-        # Create the summary widget, parented to the splitter.
-        # QSplitter.insertWidget will manage it.
         summary_widget_instance = QWidget(splitter_widget)
         summary_layout = QVBoxLayout(summary_widget_instance)
         summary_label = QLabel(f"<b>Query Summary</b><br>{summary_text}")
@@ -442,16 +444,13 @@ class QueryPanelMixin:
         summary_widget_instance.setLayout(summary_layout)
 
         if isinstance(splitter_widget, QSplitter):
-            # Insert the summary widget at the top of the splitter
             splitter_widget.insertWidget(0, summary_widget_instance)
         else:
-            # Fallback: if parent is not a QSplitter, try to use its layout.
-            # This is less ideal and indicates a potential structure mismatch.
             parent_layout = splitter_widget.layout()
             if parent_layout:
                 parent_layout.insertWidget(0, summary_widget_instance)
 
-        summary_widget_instance.show()  # Ensure the newly added widget is visible
+        summary_widget_instance.show()
         self._explain_summary_widget = summary_widget_instance
 
     def _display_explain_tree(self, result: Any) -> None:
@@ -506,9 +505,9 @@ class QueryPanelMixin:
 
         for key in search_keys:
             val = plan.get(key)
-            result = self._search_plan_value(val, stage_name)
-            if result:
-                return result
+            found = self._search_plan_value(val, stage_name)
+            if found:
+                return found
         return None
 
     def _search_plan_value(self, val: Any, stage_name: str) -> dict[str, Any] | None:
