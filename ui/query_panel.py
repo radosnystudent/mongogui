@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -7,21 +8,33 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
     QAbstractItemView,
     QDialog,
+    QHeaderView,
+    QLabel,
     QMenu,
     QMessageBox,
     QSplitter,  # Added QSplitter
     QTableWidgetItem,
     QTextEdit,
     QTreeWidgetItem,
+    QVBoxLayout,
     QWidget,
 )
 
 from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE, SCHEMA_DIR
 from ui.edit_document_dialog import EditDocumentDialog
+from utils.error_handling import handle_exception
 
 
 def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
-    """Given a schema dict and a path (e.g., ["covers"]), return available fields at that path."""
+    """
+    Given a schema dict and a path (e.g., ["covers"]), return available fields at that path.
+
+    Args:
+        schema: The schema dictionary.
+        path: List of keys representing the path in the schema.
+    Returns:
+        List of available field names at the specified path.
+    """
     node = schema
     for part in path:
         if isinstance(node, dict) and part in node:
@@ -36,6 +49,11 @@ def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
 
 
 class QueryPanelMixin:
+    """
+    Mixin for query panel logic, providing query execution, result display, and related UI logic.
+    Intended to be used with PyQt5 QWidget subclasses.
+    """
+
     mongo_client: Any
     result_display: "QTextEdit"
     query_input: Any
@@ -55,6 +73,10 @@ class QueryPanelMixin:
     _explain_summary_widget: QWidget | None = None
 
     def execute_query(self) -> None:
+        """
+        Execute the current query in the query input widget and update the results display.
+        Handles error reporting and updates UI state accordingly.
+        """
         if not self.mongo_client:
             self._set_db_info_label("No database connection")
             return
@@ -63,27 +85,39 @@ class QueryPanelMixin:
             self._set_db_info_label("Please enter a query")
             return
         try:
-            # Use server-side pagination
             result = self.mongo_client.execute_query(
                 query_text,
                 page=self.current_page,
                 page_size=self.page_size,
             )
-            if isinstance(result, list):
-                self.results = result
+            if result.is_ok:
+                self.results = result.unwrap()
                 self.last_query = query_text
                 self.display_results()
             else:
-                self._set_db_info_label(f"Error: {result}")
+                self._set_db_info_label(f"Error: {result.unwrap_err()}")
         except Exception as e:
+            handle_exception(
+                e, parent=getattr(self, "parent", None), title="Query Error"
+            )
             self._set_db_info_label(f"Query error: {str(e)}")
 
     def _set_db_info_label(self, text: str) -> None:
+        """
+        Set the database info label text, if present.
+
+        Args:
+            text: The text to display in the info label.
+        """
         label = getattr(self, "db_info_label", None)
         if label and hasattr(label, "setText"):
             label.setText(text)
 
     def display_results(self) -> None:
+        """
+        Display the query results in the UI, updating the table and tree widgets as needed.
+        Handles empty result cases and resets UI state.
+        """
         # Reset UI state properly for query results
         self._reset_ui_for_query_results()
 
@@ -367,8 +401,6 @@ class QueryPanelMixin:
 
     def _setup_explain_tree_view(self) -> None:
         """Set up the tree view for explain results."""
-        from PyQt5.QtWidgets import QHeaderView
-
         self.json_tree.clear()
         self.json_tree.show()
         self.json_tree.header().setSectionResizeMode(0, QHeaderView.Interactive)
@@ -415,12 +447,6 @@ class QueryPanelMixin:
 
     def _create_summary_widget(self, result: Any) -> None:
         """Create and display the query summary widget."""
-        from PyQt5.QtWidgets import (
-            QLabel,
-            QVBoxLayout,
-            QWidget,
-        )
-
         summary_text = self._build_explain_summary(result)
         if not summary_text:
             summary_text = "<i>No summary available for this query plan.</i>"
@@ -657,8 +683,6 @@ class QueryPanelMixin:
     ) -> list[str]:
         """Return field suggestions based on schema and current query context."""
         # Simple parser: look for db.collection.find({"field1.field2.")
-        import re
-
         m = re.search(rf"db\\.{collection}\\.find\\(\{{.*?([\w\.]+)\\.$", text)
         if not m:
             return []

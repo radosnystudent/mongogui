@@ -1,4 +1,9 @@
-from PyQt5.QtWidgets import QWidget
+from PyQt5.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 def set_minimum_heights(
@@ -19,3 +24,37 @@ def set_minimum_heights(
         except Exception:
             pass
     window.updateGeometry()
+
+
+def setup_dialog_layout(
+    dialog: QDialog,
+    widgets: list[QWidget],
+    button_widgets: list[QWidget] | None = None,
+    layout_cls: type[QVBoxLayout] = QVBoxLayout,
+    button_layout_cls: type[QHBoxLayout] = QHBoxLayout,
+) -> None:
+    """
+    Utility to standardize dialog layout setup for QDialog-based forms.
+
+    Args:
+        dialog: The QDialog instance.
+        widgets: List of widgets to add to the main layout.
+        button_widgets: Optional list of widgets (e.g., buttons) to add in a button row.
+        layout_cls: Layout class for the main layout (must be QVBoxLayout).
+        button_layout_cls: Layout class for the button row (default QHBoxLayout).
+    """
+    layout = layout_cls(dialog)
+    for w in widgets:
+        layout.addWidget(w)
+    if button_widgets:
+        btn_layout = button_layout_cls()
+        for btn in button_widgets:
+            btn_layout.addWidget(btn)
+        # QVBoxLayout supports addLayout
+        if isinstance(layout, QVBoxLayout):
+            layout.addLayout(btn_layout)
+        else:
+            raise TypeError(
+                "setup_dialog_layout requires main layout to be QVBoxLayout if using button_widgets."
+            )
+    dialog.setLayout(layout)

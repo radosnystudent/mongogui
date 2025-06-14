@@ -67,7 +67,19 @@ jobs:
         run: |
           $mongoVersion = '6.0.5'
           $mongoUrl = "https://fastdl.mongodb.org/windows/mongodb-windows-x86_64-$mongoVersion.zip"
-          Invoke-WebRequest -Uri $mongoUrl -OutFile mongo.zip
+          $maxRetries = 5
+          $retry = 0
+          while ($retry -lt $maxRetries) {
+            try {
+              curl.exe -L -o mongo.zip $mongoUrl
+              if (Test-Path mongo.zip) { break }
+            } catch {
+              Write-Host "Download attempt $($retry+1) failed."
+            }
+            Start-Sleep -Seconds 5
+            $retry++
+          }
+          if (!(Test-Path mongo.zip)) { Write-Error 'MongoDB zip download failed after retries.'; exit 1 }
           $extractPath = "$PWD\mongodb"
           Expand-Archive -Path mongo.zip -DestinationPath $extractPath
           $mongoDir = Get-ChildItem -Directory -Path $extractPath -Recurse | Where-Object { $_.Name -like "mongodb-win32-x86_64-windows-*" } | Select-Object -First 1

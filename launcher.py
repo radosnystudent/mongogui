@@ -6,6 +6,7 @@ This script automatically detects the platform and runs the appropriate
 startup script or launches the application directly.
 """
 
+import importlib.util
 import os
 import platform
 import subprocess
@@ -25,13 +26,13 @@ def detect_platform() -> str:
 
 
 def run_command(command: list[str], shell: bool = False) -> bool:
-    """Run a command and return success status."""
+    """Run a command and return success status. Only supports list[str] for command."""
     if shell:
-        # nosec B602: subprocess call with shell=True identified, security issue.
-        # This is only used for trusted scripts, not user input.
-        pass
+        raise ValueError(
+            "shell=True is not supported for run_command in this launcher."
+        )
     try:
-        result = subprocess.run(command, shell=shell, check=True)
+        result = subprocess.run(command, shell=False, check=True)
         return result.returncode == 0
     except subprocess.CalledProcessError:
         return False
@@ -110,8 +111,6 @@ def ensure_dependencies(pip_exe: Path) -> None:
     """Ensure all dependencies are installed."""
     print("Checking dependencies...")
     try:
-        import importlib.util
-
         for pkg in ["keyring", "pymongo", "PyQt5"]:
             if importlib.util.find_spec(pkg) is None:
                 raise ImportError(f"{pkg} not found")

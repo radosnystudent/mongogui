@@ -3,6 +3,7 @@ from typing import Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
+    QApplication,
     QDialog,
     QMenu,
     QMessageBox,
@@ -15,7 +16,7 @@ from PyQt5.QtWidgets import (
 )
 
 from ui.constants import SCHEMA_DIR
-from ui.index_dialog import IndexDialog
+from ui.index_dialog import IndexDialog, IndexEditDialog
 from ui.schema_editor_dialog import SchemaEditorDialog
 
 
@@ -278,8 +279,6 @@ class CollectionPanelMixin:
         return {k: v for k, v in data.items() if k not in ("key", "name")}
 
     def show_edit_index_dialog(self, collection_name: str, index_dict: dict) -> None:
-        from ui.index_dialog import IndexEditDialog
-
         dlg = IndexEditDialog(index_dict, self.collection_tree)
         if dlg.exec_() == QDialog.Accepted:
             data = dlg.get_index_data()
@@ -397,8 +396,6 @@ class CollectionPanelMixin:
         self, item: QTreeWidgetItem, column: int
     ) -> None:
         # If MainWindow overrides this, call its version
-        from PyQt5.QtWidgets import QApplication
-
         main_window = QApplication.activeWindow()
         if (
             main_window

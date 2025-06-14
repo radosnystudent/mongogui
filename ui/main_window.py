@@ -1,4 +1,11 @@
-from collections.abc import Callable
+"""
+Main application window for the MongoDB GUI.
+"""
+
+# This module defines the MainWindow class and related UI logic for the main application window.
+# All UI logic is separated from business logic and database operations.
+# Use composition and the Observer pattern for state management.
+
 from typing import Any
 
 from PyQt5.QtCore import Qt
@@ -19,30 +26,20 @@ from PyQt5.QtWidgets import (
 )
 
 from db.connection_manager import ConnectionManager
-from db.mongo_client import MongoClientWrapper
-from db.utils import convert_to_object_id  # Moved import to top
 from ui.collection_panel import CollectionPanelMixin
+from ui.connection_manager_window import ConnectionManagerWindow
 from ui.connection_widgets import ConnectionWidgetsMixin
-from ui.constants import EDIT_DOCUMENT_TITLE
 from ui.edit_document_dialog import EditDocumentDialog
 from ui.query_panel import QueryPanelMixin
 from ui.query_tab import QueryTabWidget
 from ui.ui_utils import set_minimum_heights
-
-bson_dumps: Callable[..., str] | None
-try:
-    from bson.json_util import dumps as _bson_dumps
-
-    bson_dumps = _bson_dumps
-except ImportError:
-    bson_dumps = None
+from utils.error_handling import handle_exception
+from utils.state_manager import StateManager, StateObserver
 
 NO_DB_CONNECTION_MSG = "No database connection"
 
 
-class MainWindow(
-    QMainWindow, ConnectionWidgetsMixin, QueryPanelMixin, CollectionPanelMixin
-):
+class MainWindow(QMainWindow, StateObserver):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("MongoDB GUI")
@@ -51,9 +48,12 @@ class MainWindow(
 
         # Instantiate ConnectionManager
         self.conn_manager = ConnectionManager()
+        self.state_manager = StateManager()
+        self.state_manager.subscribe(self)
+        self._active_clients: dict[str, Any] = {}
+        self._mongo_client: Any = None
 
         # Initialize components
-        self.mongo_client: MongoClientWrapper | None = None
         self.current_connection: dict[str, Any] | None = None
         self.current_page = 0
         self.page_size = 50
@@ -68,9 +68,12 @@ class MainWindow(
         self.query_tabs.tabCloseRequested.connect(self._close_query_tab)
         self.query_tabs.setMovable(True)
 
-        from PyQt5.QtWidgets import QVBoxLayout
-
         self.connection_layout = QVBoxLayout()
+
+        # Composition: instantiate helpers
+        self.connection_widgets = ConnectionWidgetsMixin()
+        self.query_panel = QueryPanelMixin()
+        self.collection_panel = CollectionPanelMixin()
 
         self.setup_ui()
         self.load_connections()
@@ -93,8 +96,6 @@ class MainWindow(
         left_layout.addWidget(open_conn_mgr_btn)
 
         # Collection tree (replaces old button list)
-        from PyQt5.QtWidgets import QTreeWidget
-
         self.collection_tree = QTreeWidget()
         self.collection_tree.setMinimumHeight(200)
         left_layout.addWidget(self.collection_tree)
@@ -124,21 +125,15 @@ class MainWindow(
             and active_db_label in self.active_clients
         ):
             mongo_client = self.active_clients[active_db_label]
-        elif (
-            not active_db_label and self.mongo_client
-        ):  # Fallback for a general connection
+        elif not active_db_label and self.mongo_client:
             mongo_client = self.mongo_client
-            if self.current_connection:
-                active_db_label = self.current_connection.get("label")
 
         # Prevent opening a tab if no client is resolved, unless it's the initial state without any tabs.
         is_initial_empty_state = not self.query_tabs.count() and not (
             hasattr(self, "active_clients") and self.active_clients
         )
         if not mongo_client and not is_initial_empty_state:
-            QMessageBox.information(
-                self, "New Query Tab", "Please connect to a database first."
-            )
+            QMessageBox.warning(self, "No Connection", NO_DB_CONNECTION_MSG)
             return
 
         # If mongo_client is still None here, it means we are in the initial empty state or a connection is missing.
@@ -148,8 +143,7 @@ class MainWindow(
         actual_collection_name_for_tab = collection_name if collection_name else None
         tab_title = f"Query - {active_db_label}" if active_db_label else "New Query"
         if collection_name and active_db_label and collection_name != active_db_label:
-            # If a collection is specified, show it in the tab title
-            tab_title = f"Query - {active_db_label}.{collection_name}"
+            tab_title = f"{collection_name} - {active_db_label}"
 
         tab = QueryTabWidget(
             parent=self,
@@ -165,16 +159,21 @@ class MainWindow(
     def _close_query_tab(self, index: int) -> None:
         widget = self.query_tabs.widget(index)
         if widget:
-            self.query_tabs.removeTab(index)
-            widget.deleteLater()
+            self._close_query_tab_by_widget(widget)
 
     def _close_query_tab_by_widget(self, widget: QWidget) -> None:
         index = self.query_tabs.indexOf(widget)
         if index != -1:
-            self._close_query_tab(index)
+            self.query_tabs.removeTab(index)
+            widget.deleteLater()
 
     def _handle_database_click(self, item_name: str) -> None:
-        """Handles clicks on database items in the collection tree."""
+        """
+        Handle clicks on database items in the collection tree.
+
+        Args:
+            item_name (str): The name of the database item clicked.
+        """
         self.add_query_tab(db_label=item_name, collection_name=None)
 
     def _handle_collection_click(self, item: QTreeWidgetItem) -> None:
@@ -182,22 +181,16 @@ class MainWindow(
         parent_db_item = item.parent()
         if parent_db_item:
             db_label = parent_db_item.text(0)
-            collection_name = item.text(0)
-            self.add_query_tab(db_label=db_label, collection_name=collection_name)
+            collection_name = item.text(1) if item.columnCount() > 1 else item.text(0)
+            self.add_query_tab(collection_name=collection_name, db_label=db_label)
         else:
-            QMessageBox.warning(
-                self,
-                "Error",
-                "Could not determine database for the selected collection.",
-            )
+            collection_name = item.text(1) if item.columnCount() > 1 else item.text(0)
+            self.add_query_tab(collection_name=collection_name)
 
     def _handle_index_click(self, item: QTreeWidgetItem, item_name: str) -> None:
         """Handles clicks on index items in the collection tree."""
         coll_item = item.parent()
         if not coll_item:
-            QMessageBox.warning(
-                self, "Error", "Could not determine collection for the selected index."
-            )
             return
 
         coll_data = coll_item.data(0, int(Qt.ItemDataRole.UserRole))
@@ -207,9 +200,6 @@ class MainWindow(
 
         db_item = coll_item.parent()
         if not db_item:
-            QMessageBox.warning(
-                self, "Error", "Could not determine database for the selected index."
-            )
             return
 
         db_label_for_index = db_item.text(0)
@@ -240,67 +230,42 @@ class MainWindow(
 
         # Context menu logic
         if item_type in ["collection", "index"]:
-            self.collection_tree.setContextMenuPolicy(
-                Qt.ContextMenuPolicy.CustomContextMenu
-            )
-            self.collection_tree.customContextMenuRequested.connect(
-                lambda pos: self.on_collection_tree_context_menu(pos)
-            )
+            self.collection_tree.setCurrentItem(item)
         else:
-            self.collection_tree.setContextMenuPolicy(
-                Qt.ContextMenuPolicy.DefaultContextMenu
-            )
+            self.collection_tree.clearSelection()
 
     def execute_query(self) -> None:
+        """
+        Delegate query execution to the current QueryTabWidget, or show warning if none selected.
+        """
         current_tab = self.query_tabs.currentWidget()
         if not isinstance(current_tab, QueryTabWidget):
-            QMessageBox.warning(self, "Query Error", "No active query tab selected.")
+            QMessageBox.warning(self, "No Query Tab", "No query tab selected.")
             return
-
-        # Delegate query execution to the current QueryTabWidget
-        # The QueryTabWidget itself should handle getting the mongo_client and db_label
         current_tab.execute_query()
 
-        # The following logic for displaying results in MainWindow might be redundant
-        # if QueryTabWidget handles its own display. Review and remove if necessary.
-        # For now, we assume QueryTabWidget updates its own UI.
-        # If MainWindow needs to react to results (e.g. status bar), signals/slots would be better.
-
-    # display_results, display_table_results, display_tree_results, edit_document,
-    # update_document_in_db, add_tree_item, clear_query, previous_page, next_page
-    # are primarily for the QueryPanelMixin and should ideally be managed by QueryTabWidget.
-    # MainWindow might not need its own implementations if QueryTabWidget is self-contained.
-    # For now, let's leave them but note they might become obsolete or need refactoring.
-
     def display_results(self) -> None:
-        # This method in MainWindow might be deprecated if QueryTabWidget handles its own display.
-        # Forwarding to current tab for now, or consider removing.
+        """
+        Display query results in the current tab or fallback to main window table/tree.
+        """
         current_tab = self.query_tabs.currentWidget()
         if isinstance(current_tab, QueryTabWidget):
-            # current_tab.display_results() # QueryTabWidget.display_results will be called by its own execute_query
-            pass  # Results are displayed within the tab itself.
-        elif not self.results:  # Fallback for old direct execution path (if any)
-            if self.data_table:
-                self.data_table.setRowCount(0)
+            current_tab.display_results()
             return
-
-        # Calculate pagination
+        elif not self.results:
+            QMessageBox.information(self, "No Results", "No results to display.")
+            return
+        # Fallback: display results in main window widgets
         start_idx = self.current_page * self.page_size
         end_idx = min(start_idx + self.page_size, len(self.results))
         page_results = self.results[start_idx:end_idx]
-
-        # Update navigation controls
         self.prev_btn.setEnabled(self.current_page > 0)
         self.next_btn.setEnabled(end_idx < len(self.results))
         self.page_label.setText(f"Page {self.current_page + 1}")
         self.result_count_label.setText(
             f"Showing {start_idx + 1}-{end_idx} of {len(self.results)} results"
         )
-
-        # Display in table format
         self.display_table_results(page_results)
-
-        # Display in tree format
         self.display_tree_results(page_results)
 
     def display_table_results(self, results: list[dict[str, Any]]) -> None:
@@ -322,82 +287,55 @@ class MainWindow(
             self._table_row_docs.append(doc)
             for col, key in enumerate(columns):
                 value = doc.get(key, "")
-                self.data_table.setItem(row, col, QTableWidgetItem(str(value)))
+                item = QTableWidgetItem(str(value))
+                self.data_table.setItem(row, col, item)
 
     def display_tree_results(self, results: list[dict[str, Any]]) -> None:
         if not self.json_tree:
             return
         if not results:
             self.json_tree.clear()
-            self.json_tree.hide()
             return
         self.json_tree.clear()
         self.json_tree.show()
         for idx, doc in enumerate(results):
-            doc_id = doc.get("_id", f"Document {idx + 1}")
-            doc_item = QTreeWidgetItem(self.json_tree, [str(doc_id), ""])
-            self.add_tree_item(doc_item, doc)
-            doc_item.setExpanded(False)
-            # Store doc in item using setData with Qt.ItemDataRole
-            doc_item.setData(0, int(Qt.ItemDataRole.UserRole), doc)
+            root = QTreeWidgetItem([f"Document {idx + 1}"])
+            self.add_tree_item(root, doc)
+            self.json_tree.addTopLevelItem(root)
 
     def edit_document(self, document: dict) -> None:
         dialog = EditDocumentDialog(document, self)
         if dialog.exec_() == QDialog.Accepted:
-            edited_doc = dialog.get_edited_document()
-            if edited_doc is not None:
-                self.update_document_in_db(edited_doc)
+            edited_doc = dialog.get_document()
+            self.update_document_in_db(edited_doc)
 
     def update_document_in_db(self, edited_doc: dict) -> None:
-        # Update document in DB using self.mongo_client
         if not self.mongo_client or "_id" not in edited_doc:
             QMessageBox.warning(
-                self,
-                EDIT_DOCUMENT_TITLE,
-                "Cannot update document: missing _id or no DB connection.",
+                self, "Update Error", "No MongoDB client or missing _id."
             )
             return
         try:
-            # Use the current collection (parsed from last_query or last_collection)
-            collection = self.last_collection
-            if not collection:
-                QMessageBox.warning(
-                    self, EDIT_DOCUMENT_TITLE, "Cannot determine collection for update."
-                )
-                return
-            # Convert _id to ObjectId if possible
-            edited_doc["_id"] = convert_to_object_id(edited_doc["_id"])
             result = self.mongo_client.update_document(
-                collection, edited_doc["_id"], edited_doc
+                self.last_collection, edited_doc["_id"], edited_doc
             )
             if result:
-                QMessageBox.information(
-                    self, EDIT_DOCUMENT_TITLE, "Document updated successfully."
-                )
-                self.execute_query()  # Refresh results
+                QMessageBox.information(self, "Success", "Document updated.")
+                self.display_results()
             else:
-                QMessageBox.warning(
-                    self, EDIT_DOCUMENT_TITLE, "Document update failed."
-                )
+                QMessageBox.warning(self, "Update Failed", "Document update failed.")
         except Exception as e:
-            QMessageBox.critical(
-                self, EDIT_DOCUMENT_TITLE, f"Error updating document: {e}"
-            )
+            handle_exception(e, self)
 
     def add_tree_item(self, parent: QTreeWidgetItem, data: dict[str, Any]) -> None:
         for key, value in data.items():
             if isinstance(value, dict):
-                child = QTreeWidgetItem(parent, [key, ""])
+                child = QTreeWidgetItem([str(key)])
                 self.add_tree_item(child, value)
-            elif isinstance(value, list):
-                child = QTreeWidgetItem(parent, [key, f"Array ({len(value)})"])
-                for item in value:
-                    if isinstance(item, dict):
-                        self.add_tree_item(child, item)
-                    else:
-                        QTreeWidgetItem(child, ["", str(item)])
+                parent.addChild(child)
             else:
-                QTreeWidgetItem(parent, [key, str(value)])
+                child = QTreeWidgetItem([str(key), str(value)])
+                parent.addChild(child)
 
     def clear_query(self) -> None:
         self.query_input.clear()
@@ -417,10 +355,30 @@ class MainWindow(
         set_minimum_heights(self)
 
     def open_connection_manager_window(self) -> None:
-        from ui.connection_manager_window import ConnectionManagerWindow
-
         dlg = ConnectionManagerWindow(self)
         dlg.connection_selected.connect(self.connect_to_database)
         dlg.exec_()
         # Optionally: reload connections if changed
-        self.load_connections()
+
+    def on_state_update(self, state: dict[str, Any]) -> None:
+        # Update state from StateManager
+        # Example: update UI or internal state based on state dict
+        pass
+
+    def set_mongo_client(self, mongo_client: Any) -> None:
+        self.mongo_client = mongo_client
+
+    def get_mongo_client(self) -> Any:
+        return self.mongo_client
+
+    def set_active_clients(self, active_clients: dict[str, Any]) -> None:
+        self.active_clients = active_clients
+
+    def get_active_clients(self) -> dict[str, Any]:
+        return self.active_clients
+
+    # Example usage in methods:
+    def connect_to_database(self, connection_name: str) -> None:
+        # Delegate to connection_widgets mixin if available
+        if hasattr(self, "connection_widgets"):
+            self.connection_widgets.connect_to_database(connection_name)

@@ -21,8 +21,11 @@ def test_explain_find_query(mock_mongo_client: MagicMock) -> None:
     wrapper.client = mock_client_instance
     wrapper.current_db = "test_db"
     result = wrapper.execute_query("db.test.find({})", explain=True)
-    assert isinstance(result, dict)
-    assert "queryPlanner" in result
+    # Unwrap Result for assertion
+    assert result.is_ok()
+    value = result.unwrap()
+    assert isinstance(value, dict)
+    assert "queryPlanner" in value
 
 
 @patch("db.mongo_client.MongoClient")
@@ -38,5 +41,8 @@ def test_explain_aggregate_query(mock_mongo_client: MagicMock) -> None:
     wrapper.client = mock_client_instance
     wrapper.current_db = "test_db"
     result = wrapper.execute_query('db.test.aggregate([{"$match": {}}])', explain=True)
-    assert isinstance(result, dict)
-    assert "ok" in result
+    # Unwrap Result for assertion
+    assert result.is_ok()
+    value = result.unwrap()
+    assert isinstance(value, dict)
+    assert "ok" in value

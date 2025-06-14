@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -24,7 +25,7 @@ if TYPE_CHECKING:
 class ConnectionWidgetsMixin(CollectionPanelMixin):
     connection_layout: "QVBoxLayout"
     conn_manager: Any
-    result_display: "QTextEdit"
+    result_display: QTextEdit | None
     mongo_client: Any
     query_input: Any
     data_table: Any

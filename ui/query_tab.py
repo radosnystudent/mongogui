@@ -1,3 +1,4 @@
+import re
 from collections.abc import Callable
 from typing import Any
 
@@ -21,11 +22,13 @@ from PyQt5.QtWidgets import (
 
 from ui.query_panel import QueryPanelMixin
 from ui.ui_utils import set_minimum_heights
+from utils.error_handling import handle_exception
 
 
 class QueryTabWidget(QWidget, QueryPanelMixin):
     """
     A single query tab containing query input, controls, and results for a collection.
+    Provides UI and logic for executing queries and displaying results.
     """
 
     def __init__(
@@ -36,6 +39,16 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         mongo_client: Any = None,
         on_close: Callable[[QWidget], None] | None = None,
     ) -> None:
+        """
+        Initialize the QueryTabWidget.
+
+        Args:
+            parent: Parent QWidget.
+            collection_name: Name of the MongoDB collection.
+            db_label: Label for the database.
+            mongo_client: MongoDB client instance.
+            on_close: Callback for when the tab is closed.
+        """
         super().__init__(parent)
         self.collection_name = collection_name
         self.db_label = db_label
@@ -50,6 +63,9 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         self._setup_ui()
 
     def _setup_ui(self) -> None:
+        """
+        Set up the UI layout and widgets for the query tab.
+        """
         layout = QVBoxLayout(self)
         # Query input
         query_label = QLabel("Query:")
@@ -148,13 +164,27 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         self._popup_shown = False
 
     def _close_tab(self) -> None:
+        """Close the query tab, triggering the on_close callback if set."""
         if self.on_close:
             self.on_close(self)
 
     def set_mongo_client(self, mongo_client: Any) -> None:
+        """
+        Set the MongoDB client instance.
+
+        Args:
+            mongo_client: MongoDB client instance.
+        """
         self.mongo_client = mongo_client
 
     def set_collection(self, collection_name: str, db_label: str) -> None:
+        """
+        Set the MongoDB collection and update the placeholder text for the query input.
+
+        Args:
+            collection_name: Name of the MongoDB collection.
+            db_label: Label for the database.
+        """
         self.collection_name = collection_name
         self.last_collection = collection_name
         self.db_label = db_label
@@ -163,10 +193,14 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
             f"Enter MongoDB query (e.g., db.{collection_name}.find({{}}))"
         )
 
-    # Optionally, override execute_query to use the correct mongo_client/collection
-    # ...existing code for QueryPanelMixin methods...
-
     def execute_query(self) -> None:
+        """
+        Execute the query entered in the query input field.
+
+        This method retrieves the query text, validates it, and sends it to the
+        MongoDB client for execution. The results are then processed and displayed
+        in the results area.
+        """
         if not self.mongo_client:
             self._set_db_info_label("No database connection")
             return
@@ -175,31 +209,45 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
             self._set_db_info_label("Please enter a query")
             return
         try:
-            # Use server-side pagination
             result = self.mongo_client.execute_query(
                 query_text,
                 page=self.current_page,
                 page_size=self.page_size,
             )
-            if isinstance(result, list):
-                self.results = result
+            if result.is_ok:
+                self.results = result.unwrap()
                 self.last_query = query_text
                 self.display_results()
             else:
-                self._set_db_info_label(f"Error: {result}")
+                self._set_db_info_label(f"Error: {result.unwrap_err()}")
         except Exception as e:
+            handle_exception(
+                e, parent=getattr(self, "parent", None), title="Query Error"
+            )
             self._set_db_info_label(f"Query error: {str(e)}")
 
     def next_page(self) -> None:
+        """
+        Navigate to the next page of results and execute the query.
+        """
         self.current_page += 1
         self.execute_query()
 
     def previous_page(self) -> None:
+        """
+        Navigate to the previous page of results and execute the query.
+        """
         if self.current_page > 0:
             self.current_page -= 1
             self.execute_query()
 
     def _on_page_size_changed(self, value: str) -> None:
+        """
+        Handle changes to the page size selector.
+
+        Args:
+            value: New page size as a string.
+        """
         try:
             new_size = int(value)
             if new_size != self.page_size:
@@ -210,9 +258,21 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
             pass
 
     def _on_view_mode_changed(self, idx: int) -> None:
+        """
+        Change the results view mode (Tree View or Table View).
+
+        Args:
+            idx: Index of the selected view mode.
+        """
         self.results_stack.setCurrentIndex(idx)
 
     def display_results(self) -> None:
+        """
+        Display the query results in the results area.
+
+        This method updates the UI to show the results of the executed query,
+        including pagination controls and result views (tree or table).
+        """
         self._reset_ui_for_query_results()
         self.setup_query_panel_signals()
         if not self.results:
@@ -241,12 +301,16 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         self.data_table.setVisible(self.view_mode_combo.currentIndex() == 1)
 
     def _get_field_path_at_cursor(self) -> list[str]:
-        """Parse the query and cursor position to extract the field path for suggestions."""
+        """
+        Parse the query and cursor position to extract the field path for suggestions.
+
+        Returns:
+            A list of field path components.
+        """
         text = self.query_input.toPlainText()
         cursor = self.query_input.textCursor()
         pos = cursor.position()
         before = text[:pos]
-        import re
 
         # Try to find the last field path before the cursor, e.g. {"documents. or {documents.documentId.
         m = re.search(r"\{[^{}]*?([\w\.]+\.)?$", before)
@@ -257,12 +321,16 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         return []
 
     def _show_schema_suggestions(self) -> None:
+        """
+        Show schema suggestions for the fields in the query.
+
+        This method analyzes the current query and cursor position to provide
+        autocomplete suggestions for MongoDB document fields.
+        """
         db = self.db_label or self.last_db_label
         collection = self.collection_name or self.last_collection
         # If collection is not set, try to extract from query input
         if not collection:
-            import re
-
             text = self.query_input.toPlainText()
             m = re.search(r"db\.(\w+)\.find", text)
             if m:
@@ -278,7 +346,12 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
             self._hide_suggestion_popup()
 
     def _show_suggestion_popup(self, suggestions: list[str]) -> None:
-        """Show the suggestion popup with the given list of suggestions."""
+        """
+        Show the suggestion popup with the given list of suggestions.
+
+        Args:
+            suggestions: List of field path suggestions.
+        """
         self._suggestion_popup.clear()
         self._suggestion_popup.addItems(suggestions)
         cursor_rect = self.query_input.cursorRect()
@@ -290,6 +363,16 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
 
     # PyQt5 expects the argument names to be a0 and a1 for eventFilter, but for clarity, we alias them internally.
     def eventFilter(self, a0: QObject | None, a1: QEvent | None) -> bool:
+        """
+        Filter events for the query input field to provide custom behavior.
+
+        Args:
+            a0: The object that the event is directed to.
+            a1: The event itself.
+
+        Returns:
+            True if the event was handled, False otherwise.
+        """
         watched = a0
         event = a1
         if watched is not self.query_input:
@@ -324,6 +407,12 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         return super().eventFilter(watched, event)
 
     def _insert_suggestion(self, item: QListWidgetItem | None) -> None:
+        """
+        Insert the selected suggestion into the query input field.
+
+        Args:
+            item: The QListWidgetItem representing the selected suggestion.
+        """
         if item is None:
             return
         suggestion = item.text()
@@ -335,5 +424,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         self._hide_suggestion_popup()
 
     def _hide_suggestion_popup(self) -> None:
+        """Hide the suggestion popup."""
         self._suggestion_popup.hide()
         self._popup_shown = False

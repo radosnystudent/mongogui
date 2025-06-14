@@ -1,3 +1,6 @@
+import datetime
+import json
+import os
 from typing import Any
 
 from PyQt5.QtCore import Qt, pyqtSignal
@@ -6,18 +9,17 @@ from PyQt5.QtWidgets import (
     QAction,
     QDialog,
     QFileDialog,
-    QHBoxLayout,
     QMessageBox,
     QPushButton,
     QToolBar,
     QTreeWidget,
     QTreeWidgetItem,
-    QVBoxLayout,
     QWidget,  # Add QWidget for type annotation
 )
 
 from db.connection_manager import ConnectionManager
 from ui.connection_dialog import ConnectionDialog
+from ui.ui_utils import setup_dialog_layout
 
 NO_CONN_MSG = "No connection selected."
 TO_URI_LABEL = "To URI"
@@ -31,10 +33,7 @@ class ConnectionManagerWindow(QDialog):
         self.setWindowTitle("Connection Manager")
         self.setModal(True)  # Ensure window is modal and stays on top
         self.resize(700, 400)
-        layout = QVBoxLayout(self)
         self.conn_manager = ConnectionManager()
-
-        # Toolbar
         self.toolbar = QToolBar()
         self.action_new_conn = QAction("New connection", self)
         self.action_new_folder = QAction("New folder", self)
@@ -55,22 +54,15 @@ class ConnectionManagerWindow(QDialog):
             self.action_to_uri,
         ]:
             self.toolbar.addAction(action)
-        layout.addWidget(self.toolbar)
-
-        # Tree
         self.tree = QTreeWidget()
         self.tree.setHeaderLabels(
             ["Name", "DB Server", "Security", "Last connected", "Last modified"]
         )
-        layout.addWidget(self.tree)
-
-        # Bottom buttons
-        btn_layout = QHBoxLayout()
         self.btn_connect = QPushButton("Connect")
         self.btn_close = QPushButton("Close")
-        btn_layout.addWidget(self.btn_connect)
-        btn_layout.addWidget(self.btn_close)
-        layout.addLayout(btn_layout)
+        widgets = [self.toolbar, self.tree]
+        button_widgets: list[QWidget] = [self.btn_connect, self.btn_close]
+        setup_dialog_layout(self, widgets, button_widgets)
 
         self.btn_close.clicked.connect(self.reject)
         self.btn_connect.clicked.connect(self.connect_selected)
@@ -82,7 +74,6 @@ class ConnectionManagerWindow(QDialog):
         self.action_export.triggered.connect(self.export_connections)
         self.action_to_uri.triggered.connect(self.copy_uri_selected)
         self.action_new_folder.triggered.connect(self.add_folder)
-
         self.tree.itemDoubleClicked.connect(self.connect_selected)
 
         self.load_connections()
@@ -115,7 +106,6 @@ class ConnectionManagerWindow(QDialog):
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
-                import datetime
 
                 now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
                 # Save extra fields manually after add_connection
@@ -123,9 +113,6 @@ class ConnectionManagerWindow(QDialog):
                     name, db, ip, int(port), login, password, tls
                 )
                 # Patch file to add last_connected/last_modified
-                import json
-                import os
-
                 path = os.path.join(self.conn_manager.storage_path, f"{name}.json")
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
@@ -161,16 +148,12 @@ class ConnectionManagerWindow(QDialog):
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
-                import datetime
 
                 now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
                 self.conn_manager.update_connection(
                     conn["name"], db, ip, int(port), login, password, tls, new_name=name
                 )
                 # Patch file to update last_modified
-                import json
-                import os
-
                 path = os.path.join(self.conn_manager.storage_path, f"{name}.json")
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
@@ -220,15 +203,10 @@ class ConnectionManagerWindow(QDialog):
     def connect_selected(self, *args: Any) -> None:
         conn = self.get_selected_connection()
         if conn:
-            import datetime
-
             now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
             conn["last_connected"] = now
             conn["last_modified"] = now
             # Patch file to update last_connected/last_modified
-            import json
-            import os
-
             path = os.path.join(self.conn_manager.storage_path, f"{conn['name']}.json")
             with open(path, encoding="utf-8") as f:
                 data = json.load(f)
@@ -246,8 +224,6 @@ class ConnectionManagerWindow(QDialog):
         )
         if path:
             try:
-                import json
-
                 with open(path, encoding="utf-8") as f:
                     data = json.load(f)
                 # Accept both a list of connections or a single connection
@@ -277,8 +253,6 @@ class ConnectionManagerWindow(QDialog):
         )
         if path:
             try:
-                import json
-
                 connections = self.conn_manager.get_connections()
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(connections, f, indent=2)
