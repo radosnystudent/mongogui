@@ -77,9 +77,12 @@ with patch.dict(sys.modules, {"keyring": mock_keyring, "keyring.errors": mock_er
             self.assertEqual(
                 mock_keyring.get_password(cm.keyring_service, f"{name}_login"), login
             )
-            encrypted_password = mock_keyring.get_password(cm.keyring_service, f"{name}_password")
+            encrypted_password = mock_keyring.get_password(
+                cm.keyring_service, f"{name}_password"
+            )
             self.assertIsInstance(encrypted_password, str)
             from utils.encryption import decrypt_password
+
             if encrypted_password is not None:
                 self.assertEqual(decrypt_password(encrypted_password), password)
             else:
@@ -144,11 +147,14 @@ with patch.dict(sys.modules, {"keyring": mock_keyring, "keyring.errors": mock_er
             name = "test_conn"
             login = "test_user"
             password = "test_password"
-            from utils.encryption import encrypt_password, decrypt_password
+            from utils.encryption import decrypt_password, encrypt_password
+
             # Pre-populate credentials (store encrypted password)
             mock_keyring.set_password(cm.keyring_service, f"{name}_login", login)
             encrypted_password = encrypt_password(password)
-            mock_keyring.set_password(cm.keyring_service, f"{name}_password", encrypted_password)
+            mock_keyring.set_password(
+                cm.keyring_service, f"{name}_password", encrypted_password
+            )
             test_data = {
                 "name": name,
                 "db": "test_db",

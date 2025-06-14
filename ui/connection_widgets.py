@@ -54,7 +54,9 @@ class ConnectionWidgetManager:
         )
         conn_layout.addWidget(details)
         connect_btn = QPushButton("Connect")
-        connect_btn.clicked.connect(lambda: self.ui_handler.connect_to_database(conn["name"]))
+        connect_btn.clicked.connect(
+            lambda: self.ui_handler.connect_to_database(conn["name"])
+        )
         conn_layout.addWidget(connect_btn)
         self.connection_layout.addWidget(conn_widget)
 
@@ -62,12 +64,19 @@ class ConnectionWidgetManager:
         self.conn_manager.remove_connection(name)
         self.load_connections()
 
+
 class ConnectionStateManager:
     def __init__(self, mongo_client_factory):
         self.active_clients: dict[str, Any] = {}
         self.mongo_client_factory = mongo_client_factory
 
-    def connect_to_database(self, connection_name: str, conn_manager, parent_widget, add_database_collections):
+    def connect_to_database(
+        self,
+        connection_name: str,
+        conn_manager,
+        parent_widget,
+        add_database_collections,
+    ):
         conn_data = conn_manager.get_connection_by_name(connection_name)
         if not conn_data:
             QMessageBox.critical(
@@ -103,13 +112,16 @@ class ConnectionStateManager:
             del self.active_clients[connection_name]
             clear_database_collections(connection_name)
 
+
 class ConnectionUIHandler:
     def __init__(self, conn_manager, widget_manager, state_manager):
         self.conn_manager = conn_manager
         self.widget_manager = widget_manager
         self.state_manager = state_manager
 
-    def show_connection_context_menu(self, pos: Any, name: str, widget: QWidget) -> None:
+    def show_connection_context_menu(
+        self, pos: Any, name: str, widget: QWidget
+    ) -> None:
         menu = QMenu(widget)
         edit_action = menu.addAction("Edit")
         duplicate_action = menu.addAction("Duplicate")
@@ -129,10 +141,14 @@ class ConnectionUIHandler:
             if conn_result:
                 name, db, ip, port, login, password, tls = conn_result
                 try:
-                    self.conn_manager.add_connection(name, db, ip, int(port), login, password, tls)
+                    self.conn_manager.add_connection(
+                        name, db, ip, int(port), login, password, tls
+                    )
                     self.widget_manager.load_connections()
                 except Exception as e:
-                    QMessageBox.critical(None, CONNECTION_ERROR_TITLE, f"Failed to add connection: {e}")
+                    QMessageBox.critical(
+                        None, CONNECTION_ERROR_TITLE, f"Failed to add connection: {e}"
+                    )
 
     def edit_connection(self, name: str) -> None:
         conn_data = self.conn_manager.get_connection_by_name(name)
@@ -162,7 +178,11 @@ class ConnectionUIHandler:
                     )
                     self.widget_manager.load_connections()
                 except Exception as e:
-                    QMessageBox.critical(None, CONNECTION_ERROR_TITLE, f"Failed to update connection: {e}")
+                    QMessageBox.critical(
+                        None,
+                        CONNECTION_ERROR_TITLE,
+                        f"Failed to update connection: {e}",
+                    )
 
     def duplicate_connection(self, name: str) -> None:
         conn_data = self.conn_manager.get_connection_by_name(name)
@@ -180,10 +200,14 @@ class ConnectionUIHandler:
             login = conn_data.get("login")
             password = conn_data.get("password")
             tls = conn_data.get("tls", False)
-            self.conn_manager.add_connection(new_name, db, ip, port, login, password, tls)
+            self.conn_manager.add_connection(
+                new_name, db, ip, port, login, password, tls
+            )
             self.widget_manager.load_connections()
         except Exception as e:
-            QMessageBox.critical(None, CONNECTION_ERROR_TITLE, f"Failed to duplicate connection: {e}")
+            QMessageBox.critical(
+                None, CONNECTION_ERROR_TITLE, f"Failed to duplicate connection: {e}"
+            )
 
     def edit_and_connect(self) -> None:
         dialog = ConnectionDialog(None)
@@ -192,11 +216,15 @@ class ConnectionUIHandler:
             if conn_result:
                 name, db, ip, port, login, password, tls = conn_result
                 try:
-                    self.conn_manager.add_connection(name, db, ip, int(port), login, password, tls)
+                    self.conn_manager.add_connection(
+                        name, db, ip, int(port), login, password, tls
+                    )
                     self.widget_manager.load_connections()
                     self.connect_to_database(name)
                 except Exception as e:
-                    QMessageBox.critical(None, CONNECTION_ERROR_TITLE, f"Failed to add and connect: {e}")
+                    QMessageBox.critical(
+                        None, CONNECTION_ERROR_TITLE, f"Failed to add and connect: {e}"
+                    )
 
     def connect_to_database(self, connection_name: str):
         # This method delegates to the state manager
@@ -205,48 +233,69 @@ class ConnectionUIHandler:
             connection_name,
             self.conn_manager,
             parent_widget,
-            getattr(self.widget_manager, "add_database_collections", lambda *a, **kw: None),
+            getattr(
+                self.widget_manager, "add_database_collections", lambda *a, **kw: None
+            ),
         )
 
     def disconnect_database(self, connection_name: str):
         self.state_manager.disconnect_database(
             connection_name,
-            getattr(self.widget_manager, "clear_database_collections", lambda *a, **kw: None),
+            getattr(
+                self.widget_manager, "clear_database_collections", lambda *a, **kw: None
+            ),
         )
+
 
 # Refactored mixin using composition
 class ConnectionWidgetsMixin(CollectionPanelMixin):
     def __init__(self, mongo_client_factory):
         super().__init__()
         # Ensure these are initialized before use
-        if not hasattr(self, 'conn_manager'):
+        if not hasattr(self, "conn_manager"):
             self.conn_manager = None  # Should be set by subclass or externally
-        if not hasattr(self, 'connection_layout'):
+        if not hasattr(self, "connection_layout"):
             self.connection_layout = QVBoxLayout()  # Or set by subclass
         self.state_manager = ConnectionStateManager(mongo_client_factory)
-        self.ui_handler = ConnectionUIHandler(self.conn_manager, self, self.state_manager)
-        self.widget_manager = ConnectionWidgetManager(self.connection_layout, self.conn_manager, self.ui_handler)
+        self.ui_handler = ConnectionUIHandler(
+            self.conn_manager, self, self.state_manager
+        )
+        self.widget_manager = ConnectionWidgetManager(
+            self.connection_layout, self.conn_manager, self.ui_handler
+        )
 
     # Optionally, expose methods for compatibility
     def load_connections(self) -> None:
         self.widget_manager.load_connections()
+
     def add_connection_widget(self, conn: dict[str, Any]) -> None:
         self.widget_manager.add_connection_widget(conn)
-    def show_connection_context_menu(self, pos: Any, name: str, widget: QWidget) -> None:
+
+    def show_connection_context_menu(
+        self, pos: Any, name: str, widget: QWidget
+    ) -> None:
         self.ui_handler.show_connection_context_menu(pos, name, widget)
+
     def add_connection(self) -> None:
         self.ui_handler.add_connection()
+
     def edit_connection(self, name: str) -> None:
         self.ui_handler.edit_connection(name)
+
     def duplicate_connection(self, name: str) -> None:
         self.ui_handler.duplicate_connection(name)
+
     def edit_and_connect(self) -> None:
         self.ui_handler.edit_and_connect()
+
     def remove_connection(self, name: str) -> None:
         self.widget_manager.remove_connection(name)
+
     def connect_to_database(self, connection_name: str) -> None:
         self.ui_handler.connect_to_database(connection_name)
+
     def disconnect_database(self, connection_name: str) -> None:
         self.ui_handler.disconnect_database(connection_name)
+
 
 # NOTE: CollectionPanelMixin is still used as a mixin. For full decoupling, consider composition in future refactors.

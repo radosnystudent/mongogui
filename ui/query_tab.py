@@ -255,6 +255,7 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         Set the number of results per page.
         """
         import logging
+
         try:
             new_size = int(value)
             if new_size != self.page_size:

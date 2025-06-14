@@ -669,6 +669,7 @@ class QueryPanelMixin:
         self, db: str, collection: str, path: list[str]
     ) -> list[str]:
         import logging
+
         schema_path = os.path.join(SCHEMA_DIR, f"{db}__{collection}.json")
         if not os.path.exists(schema_path):
             return []

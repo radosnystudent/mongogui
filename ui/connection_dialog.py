@@ -10,8 +10,8 @@ from PyQt5.QtWidgets import (
 )
 
 from ui.ui_utils import setup_dialog_layout
-from utils.validators import validate_connection_params
 from utils.encryption import encrypt_password
+from utils.validators import validate_connection_params
 
 
 class ConnectionDialog(QDialog):
@@ -75,7 +75,11 @@ class ConnectionDialog(QDialog):
         password = self.password_input.text().strip()
         tls = self.tls_checkbox.isChecked()
         if not (name and db and ip and port):
-            QMessageBox.critical(self, "Validation Error", "All fields except login/password are required.")
+            QMessageBox.critical(
+                self,
+                "Validation Error",
+                "All fields except login/password are required.",
+            )
             return
         is_valid, error_msg = validate_connection_params(ip, port, db)
         if not is_valid:

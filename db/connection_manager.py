@@ -9,7 +9,8 @@ from typing import Any
 
 import keyring
 from keyring.errors import KeyringError, PasswordDeleteError
-from utils.encryption import encrypt_password, decrypt_password
+
+from utils.encryption import encrypt_password
 
 
 class ConnectionManager:
@@ -85,7 +86,9 @@ class ConnectionManager:
             keyring.set_password(self.keyring_service, f"{name}_login", login)
         if password:
             encrypted_password = encrypt_password(password)
-            keyring.set_password(self.keyring_service, f"{name}_password", encrypted_password)
+            keyring.set_password(
+                self.keyring_service, f"{name}_password", encrypted_password
+            )
 
     def get_connections(self: "ConnectionManager") -> list[dict[str, Any]]:
         """

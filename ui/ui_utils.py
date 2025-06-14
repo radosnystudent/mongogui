@@ -1,10 +1,11 @@
+import logging
+
 from PyQt5.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QVBoxLayout,
     QWidget,
 )
-import logging
 
 
 def set_minimum_heights(
