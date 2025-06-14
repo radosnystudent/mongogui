@@ -668,6 +668,7 @@ class QueryPanelMixin:
     def get_collection_schema_fields(
         self, db: str, collection: str, path: list[str]
     ) -> list[str]:
+        import logging
         schema_path = os.path.join(SCHEMA_DIR, f"{db}__{collection}.json")
         if not os.path.exists(schema_path):
             return []
@@ -675,7 +676,8 @@ class QueryPanelMixin:
             with open(schema_path, encoding="utf-8") as f:
                 schema = json.load(f)
             return get_schema_fields_for_path(schema, path)
-        except Exception:
+        except Exception as e:
+            logging.warning(f"Failed to load schema fields for {db}.{collection}: {e}")
             return []
 
     def provide_query_suggestions(

@@ -4,6 +4,7 @@ from PyQt5.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+import logging
 
 
 def set_minimum_heights(
@@ -16,13 +17,13 @@ def set_minimum_heights(
     if hasattr(window, "data_table") and window.data_table is not None:
         try:
             window.data_table.setMinimumHeight(int(window.height() * 0.35))
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to set minimum height for data_table: {e}")
     if hasattr(window, "result_display") and window.result_display is not None:
         try:
             window.result_display.setMinimumHeight(int(window.height() * 0.35))
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to set minimum height for result_display: {e}")
     window.updateGeometry()
 
 

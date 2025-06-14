@@ -4,11 +4,13 @@ from PyQt5.QtWidgets import (
     QDialog,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QWidget,
 )
 
 from ui.ui_utils import setup_dialog_layout
+from utils.validators import validate_connection_params
 
 
 class ConnectionDialog(QDialog):
@@ -71,9 +73,15 @@ class ConnectionDialog(QDialog):
         login = self.login_input.text().strip()
         password = self.password_input.text().strip()
         tls = self.tls_checkbox.isChecked()
-        if name and db and ip and port:
-            self.connection_result = (name, db, ip, port, login, password, tls)
-            super().accept()
+        if not (name and db and ip and port):
+            QMessageBox.critical(self, "Validation Error", "All fields except login/password are required.")
+            return
+        is_valid, error_msg = validate_connection_params(ip, port, db)
+        if not is_valid:
+            QMessageBox.critical(self, "Validation Error", error_msg)
+            return
+        self.connection_result = (name, db, ip, port, login, password, tls)
+        super().accept()
 
     def get_result(self) -> tuple[str, str, str, str, str, str, bool] | None:
         return self.connection_result

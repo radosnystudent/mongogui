@@ -86,14 +86,16 @@ class SchemaEditorDialog(QDialog):
         """
         Format the JSON when the dialog is shown, if possible.
         """
+        import logging
+
         try:
             raw = self.text_edit.toPlainText()
             if raw.strip():
                 obj = json.loads(raw)
                 pretty = json.dumps(obj, indent=4, ensure_ascii=False)
                 self.text_edit.setPlainText(pretty)
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to format JSON on showEvent: {e}")
         super().showEvent(a0)
 
     def format_json(self) -> None:

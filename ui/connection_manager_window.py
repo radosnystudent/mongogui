@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 from db.connection_manager import ConnectionManager
 from ui.connection_dialog import ConnectionDialog
 from ui.ui_utils import setup_dialog_layout
+from utils.validators import validate_connection_params
 
 NO_CONN_MSG = "No connection selected."
 TO_URI_LABEL = "To URI"
@@ -106,7 +107,10 @@ class ConnectionManagerWindow(QDialog):
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
-
+                is_valid, error_msg = validate_connection_params(ip, port, db)
+                if not is_valid:
+                    QMessageBox.critical(self, "Validation Error", error_msg)
+                    return
                 now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
                 # Save extra fields manually after add_connection
                 self.conn_manager.add_connection(
@@ -148,7 +152,10 @@ class ConnectionManagerWindow(QDialog):
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
-
+                is_valid, error_msg = validate_connection_params(ip, port, db)
+                if not is_valid:
+                    QMessageBox.critical(self, "Validation Error", error_msg)
+                    return
                 now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
                 self.conn_manager.update_connection(
                     conn["name"], db, ip, int(port), login, password, tls, new_name=name

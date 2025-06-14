@@ -248,14 +248,21 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         Args:
             value: New page size as a string.
         """
+        self.set_page_size(value)
+
+    def set_page_size(self, value: str) -> None:
+        """
+        Set the number of results per page.
+        """
+        import logging
         try:
             new_size = int(value)
             if new_size != self.page_size:
                 self.page_size = new_size
                 self.current_page = 0
                 self.execute_query()
-        except Exception:
-            pass
+        except Exception as e:
+            logging.warning(f"Failed to set page size: {e}")
 
     def _on_view_mode_changed(self, idx: int) -> None:
         """
