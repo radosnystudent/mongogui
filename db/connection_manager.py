@@ -34,19 +34,23 @@ class ConnectionManager:
         Verify that keyring is available and can store/retrieve credentials.
         Raises an exception if keyring is not functional.
         """
+        test_key: str = "__test_key__"
+        test_value: str = "__test_value__"
         try:
-            test_key: str = "__test_key__"
-            test_value: str = "__test_value__"
             keyring.set_password(self.keyring_service, test_key, test_value)
             value: str | None = keyring.get_password(self.keyring_service, test_key)
             if value != test_value:
                 raise KeyringError("Keyring storage verification failed.")
-            keyring.delete_password(self.keyring_service, test_key)
         except Exception as e:
             logging.warning(f"Keyring storage verification failed: {e}")
             raise RuntimeError(
                 "Secure credential storage (keyring) is not available or not working."
             ) from e
+        finally:
+            try:
+                keyring.delete_password(self.keyring_service, test_key)
+            except Exception:
+                pass
 
     def add_connection(
         self: "ConnectionManager",

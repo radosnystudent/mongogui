@@ -21,7 +21,7 @@ def validate_db_name(db: str) -> bool:
     if not db or ' ' in db:
         return False
     # MongoDB restrictions: https://docs.mongodb.com/manual/reference/limits/#naming-restrictions
-    invalid = set('/\. "$*<>:|?')
+    invalid = set('/\\. "$*<>:|?')
     return not any((c in invalid) for c in db)
 
 def validate_connection_params(ip: str, port: str, db: str) -> Tuple[bool, str]:

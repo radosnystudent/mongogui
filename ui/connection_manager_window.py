@@ -248,8 +248,8 @@ class ConnectionManagerWindow(QDialog):
                     )
                 self.load_connections()
                 QMessageBox.information(self, "Import", "Connections imported.")
-            except Exception as e:
-                QMessageBox.critical(self, "Import Error", str(e))
+            except Exception:
+                QMessageBox.critical(self, "Import Error", "Failed to import connections. Please check the file format and try again.")
 
     def export_connections(self) -> None:
         path, _ = QFileDialog.getSaveFileName(
@@ -264,8 +264,8 @@ class ConnectionManagerWindow(QDialog):
                 with open(path, "w", encoding="utf-8") as f:
                     json.dump(connections, f, indent=2)
                 QMessageBox.information(self, "Export", "Connections exported.")
-            except Exception as e:
-                QMessageBox.critical(self, "Export Error", str(e))
+            except Exception:
+                QMessageBox.critical(self, "Export Error", "Failed to export connections. Please check permissions and try again.")
 
     def copy_uri_selected(self) -> None:
         conn = self.get_selected_connection()

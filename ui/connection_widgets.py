@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -7,19 +7,14 @@ from PyQt5.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
-    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
 
-from db.mongo_client import MongoClientWrapper
 from ui.collection_panel import CollectionPanelMixin
 from ui.connection_dialog import ConnectionDialog
 
 CONNECTION_ERROR_TITLE = "Connection Error"
-
-if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QTextEdit
 
 
 class ConnectionWidgetManager:
@@ -68,8 +63,9 @@ class ConnectionWidgetManager:
         self.load_connections()
 
 class ConnectionStateManager:
-    def __init__(self):
-        self.active_clients: dict[str, MongoClientWrapper] = {}
+    def __init__(self, mongo_client_factory):
+        self.active_clients: dict[str, Any] = {}
+        self.mongo_client_factory = mongo_client_factory
 
     def connect_to_database(self, connection_name: str, conn_manager, parent_widget, add_database_collections):
         conn_data = conn_manager.get_connection_by_name(connection_name)
@@ -81,7 +77,7 @@ class ConnectionStateManager:
             )
             return
         try:
-            mongo_client = MongoClientWrapper()
+            mongo_client = self.mongo_client_factory()
             success = mongo_client.connect(
                 conn_data["ip"],
                 conn_data["port"],
@@ -220,14 +216,14 @@ class ConnectionUIHandler:
 
 # Refactored mixin using composition
 class ConnectionWidgetsMixin(CollectionPanelMixin):
-    def __init__(self) -> None:
+    def __init__(self, mongo_client_factory):
         super().__init__()
         # Ensure these are initialized before use
         if not hasattr(self, 'conn_manager'):
             self.conn_manager = None  # Should be set by subclass or externally
         if not hasattr(self, 'connection_layout'):
             self.connection_layout = QVBoxLayout()  # Or set by subclass
-        self.state_manager = ConnectionStateManager()
+        self.state_manager = ConnectionStateManager(mongo_client_factory)
         self.ui_handler = ConnectionUIHandler(self.conn_manager, self, self.state_manager)
         self.widget_manager = ConnectionWidgetManager(self.connection_layout, self.conn_manager, self.ui_handler)
 
@@ -252,3 +248,5 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
         self.ui_handler.connect_to_database(connection_name)
     def disconnect_database(self, connection_name: str) -> None:
         self.ui_handler.disconnect_database(connection_name)
+
+# NOTE: CollectionPanelMixin is still used as a mixin. For full decoupling, consider composition in future refactors.
