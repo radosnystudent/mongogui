@@ -9,6 +9,7 @@ from typing import Any
 
 import keyring
 from keyring.errors import KeyringError, PasswordDeleteError
+from utils.encryption import encrypt_password, decrypt_password
 
 
 class ConnectionManager:
@@ -79,11 +80,12 @@ class ConnectionManager:
         with open(os.path.join(self.storage_path, f"{name}.json"), "w") as f:
             json.dump(data, f)
 
-        # Store credentials in keyring
+        # Store credentials in keyring (encrypt password before storing)
         if login:
             keyring.set_password(self.keyring_service, f"{name}_login", login)
         if password:
-            keyring.set_password(self.keyring_service, f"{name}_password", password)
+            encrypted_password = encrypt_password(password)
+            keyring.set_password(self.keyring_service, f"{name}_password", encrypted_password)
 
     def get_connections(self: "ConnectionManager") -> list[dict[str, Any]]:
         """
@@ -117,11 +119,12 @@ class ConnectionManager:
                 data: dict[str, Any] = json.load(f)
                 # Retrieve credentials from keyring
                 login = keyring.get_password(self.keyring_service, f"{name}_login")
-                password = keyring.get_password(
+                encrypted_password = keyring.get_password(
                     self.keyring_service, f"{name}_password"
                 )
+                # Store encrypted password in data (do not decrypt here)
                 data["login"] = login
-                data["password"] = password
+                data["password"] = encrypted_password
                 return data
         except FileNotFoundError:
             return None

@@ -73,14 +73,17 @@ with patch.dict(sys.modules, {"keyring": mock_keyring, "keyring.errors": mock_er
                 data = json.load(f)
             expected_data = {"name": name, "db": db, "ip": ip, "port": port, "tls": tls}
             self.assertEqual(data, expected_data)
-            # Check that credentials are stored
+            # Check that credentials are stored (password is encrypted)
             self.assertEqual(
                 mock_keyring.get_password(cm.keyring_service, f"{name}_login"), login
             )
-            self.assertEqual(
-                mock_keyring.get_password(cm.keyring_service, f"{name}_password"),
-                password,
-            )
+            encrypted_password = mock_keyring.get_password(cm.keyring_service, f"{name}_password")
+            self.assertIsInstance(encrypted_password, str)
+            from utils.encryption import decrypt_password
+            if encrypted_password is not None:
+                self.assertEqual(decrypt_password(encrypted_password), password)
+            else:
+                self.fail("Encrypted password not found in keyring")
 
         def test_add_connection_without_credentials(self) -> None:
             cm = ConnectionManager(storage_path=self.temp_dir)
@@ -141,9 +144,11 @@ with patch.dict(sys.modules, {"keyring": mock_keyring, "keyring.errors": mock_er
             name = "test_conn"
             login = "test_user"
             password = "test_password"
-            # Pre-populate credentials
+            from utils.encryption import encrypt_password, decrypt_password
+            # Pre-populate credentials (store encrypted password)
             mock_keyring.set_password(cm.keyring_service, f"{name}_login", login)
-            mock_keyring.set_password(cm.keyring_service, f"{name}_password", password)
+            encrypted_password = encrypt_password(password)
+            mock_keyring.set_password(cm.keyring_service, f"{name}_password", encrypted_password)
             test_data = {
                 "name": name,
                 "db": "test_db",
@@ -161,9 +166,16 @@ with patch.dict(sys.modules, {"keyring": mock_keyring, "keyring.errors": mock_er
                 "port": 27017,
                 "tls": True,
                 "login": login,
-                "password": password,
+                "password": encrypted_password,
             }
             self.assertEqual(connection, expected_connection)
+            # Test decryption
+            self.assertIsNotNone(connection)
+            if connection is not None:
+                self.assertEqual(connection, expected_connection)
+                # Test decryption
+                self.assertIsNotNone(connection["password"])
+                self.assertEqual(decrypt_password(connection["password"]), password)
 
         def test_get_connection_by_name_not_found(self) -> None:
             cm = ConnectionManager(storage_path=self.temp_dir)

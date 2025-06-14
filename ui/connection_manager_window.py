@@ -20,6 +20,7 @@ from PyQt5.QtWidgets import (
 from db.connection_manager import ConnectionManager
 from ui.connection_dialog import ConnectionDialog
 from ui.ui_utils import setup_dialog_layout
+from utils.encryption import decrypt_password
 from utils.validators import validate_connection_params
 
 NO_CONN_MSG = "No connection selected."
@@ -112,7 +113,6 @@ class ConnectionManagerWindow(QDialog):
                     QMessageBox.critical(self, "Validation Error", error_msg)
                     return
                 now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
-                # Save extra fields manually after add_connection
                 self.conn_manager.add_connection(
                     name, db, ip, int(port), login, password, tls
                 )
@@ -146,7 +146,8 @@ class ConnectionManagerWindow(QDialog):
         dlg.ip_input.setText(conn.get("ip", ""))
         dlg.port_input.setText(str(conn.get("port", "")))
         dlg.login_input.setText(conn.get("login", ""))
-        dlg.password_input.setText(conn.get("password", ""))
+        # Do not decrypt password for editing; keep encrypted in dialog
+        dlg.password_input.setText("")
         dlg.tls_checkbox.setChecked(conn.get("tls", False))
         if dlg.exec_() == QDialog.Accepted:
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
@@ -196,6 +197,7 @@ class ConnectionManagerWindow(QDialog):
         while self.conn_manager.get_connection_by_name(new_name):
             new_name = f"{conn['name']}_copy_{counter}"
             counter += 1
+        # Pass encrypted password (do not decrypt here)
         self.conn_manager.add_connection(
             new_name,
             conn["db"],
@@ -221,6 +223,9 @@ class ConnectionManagerWindow(QDialog):
             data["last_modified"] = now
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(data, f)
+            # Decrypt password before emitting/using
+            if conn.get("password"):
+                conn["password"] = decrypt_password(conn["password"])
             self.selected_connection = conn
             self.connection_selected.emit(conn["name"])
             self.accept()
@@ -274,7 +279,7 @@ class ConnectionManagerWindow(QDialog):
             return
         # Build MongoDB URI
         userinfo = (
-            f"{conn['login']}:{conn['password']}@"
+            f"{conn['login']}:{decrypt_password(conn['password'])}@"
             if conn.get("login") and conn.get("password")
             else ""
         )

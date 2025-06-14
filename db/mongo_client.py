@@ -15,6 +15,7 @@ from db.constants import (
 from db.query_preprocessor import query_preprocessor
 from db.result import Result
 from db.utils import convert_to_object_id
+from utils.encryption import decrypt_password
 
 
 def require_connection(method: Any) -> Any:
@@ -84,6 +85,12 @@ class MongoClientWrapper:
             True if connection is successful, False otherwise.
         """
         try:
+            # Decrypt password if provided (it may already be decrypted, so handle errors gracefully)
+            if password:
+                try:
+                    password = decrypt_password(password)
+                except Exception:
+                    pass  # Already decrypted or not encrypted
             if login and password:
                 uri = f"mongodb://{login}:{password}@{ip}:{port}/{db}"
             else:

@@ -11,6 +11,7 @@ from PyQt5.QtWidgets import (
 
 from ui.ui_utils import setup_dialog_layout
 from utils.validators import validate_connection_params
+from utils.encryption import encrypt_password
 
 
 class ConnectionDialog(QDialog):
@@ -80,7 +81,8 @@ class ConnectionDialog(QDialog):
         if not is_valid:
             QMessageBox.critical(self, "Validation Error", error_msg)
             return
-        self.connection_result = (name, db, ip, port, login, password, tls)
+        encrypted_password = encrypt_password(password) if password else ""
+        self.connection_result = (name, db, ip, port, login, encrypted_password, tls)
         super().accept()
 
     def get_result(self) -> tuple[str, str, str, str, str, str, bool] | None:

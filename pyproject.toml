@@ -95,7 +95,6 @@ module = [
     "pymongo.*",
     "keyring.*",
 ]
-ignore_missing_imports = true
 
 # Bandit configuration
 [tool.bandit]
