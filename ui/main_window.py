@@ -36,13 +36,6 @@ from ui.ui_utils import set_minimum_heights
 from utils.error_handling import handle_exception
 from utils.state_manager import StateManager, StateObserver
 
-try:
-    from bson.json_util import dumps as _bson_dumps
-
-    bson_dumps = _bson_dumps
-except ImportError:
-    bson_dumps = None
-
 NO_DB_CONNECTION_MSG = "No database connection"
 
 
@@ -375,7 +368,7 @@ class MainWindow(QMainWindow, StateObserver):
     def set_mongo_client(self, mongo_client: Any) -> None:
         self.mongo_client = mongo_client
 
-    def get_mongo_client(self) -> dict[str, Any]:
+    def get_mongo_client(self) -> Any:
         return self.mongo_client
 
     def set_active_clients(self, active_clients: dict[str, Any]) -> None:
