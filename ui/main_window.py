@@ -71,7 +71,9 @@ class MainWindow(QMainWindow, StateObserver):
         self.connection_layout = QVBoxLayout()
 
         # Composition: instantiate helpers
-        self.connection_widgets = ConnectionWidgetsMixin()
+        from db.mongo_client import MongoClientWrapper
+
+        self.connection_widgets = ConnectionWidgetsMixin(MongoClientWrapper)
         self.query_panel = QueryPanelMixin()
         self.collection_panel = CollectionPanelMixin()
 

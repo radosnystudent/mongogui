@@ -1,22 +1,20 @@
 import base64
 import os
-
 from cryptography.fernet import Fernet
 
-# In a real app, store this key securely (e.g., in OS keyring or env var)
 FERNET_KEY_ENV = "MONGOGUI_FERNET_KEY"
 
 
 def get_fernet() -> Fernet:
     key = os.environ.get(FERNET_KEY_ENV)
     if not key:
-        # Generate and print a key for setup
-        key = Fernet.generate_key()
-        print(f"[MongoGUI] Generated Fernet key: {key.decode()}")
+        generated_key = Fernet.generate_key()
+        print(f"[MongoGUI] Generated Fernet key: {generated_key.decode()}")
         raise RuntimeError(
             f"Fernet key not set in environment variable {FERNET_KEY_ENV}"
         )
-    return Fernet(key.encode() if isinstance(key, str) else key)
+    key_bytes: bytes = key.encode() if isinstance(key, str) else key
+    return Fernet(key_bytes)
 
 
 def encrypt_password(password: str) -> str:

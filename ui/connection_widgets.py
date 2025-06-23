@@ -18,7 +18,9 @@ CONNECTION_ERROR_TITLE = "Connection Error"
 
 
 class ConnectionWidgetManager:
-    def __init__(self, connection_layout, conn_manager, ui_handler):
+    def __init__(
+        self, connection_layout: QVBoxLayout, conn_manager: Any, ui_handler: Any
+    ) -> None:
         self.connection_layout = connection_layout
         self.conn_manager = conn_manager
         self.ui_handler = ui_handler
@@ -66,17 +68,17 @@ class ConnectionWidgetManager:
 
 
 class ConnectionStateManager:
-    def __init__(self, mongo_client_factory):
+    def __init__(self, mongo_client_factory: Any) -> None:
         self.active_clients: dict[str, Any] = {}
         self.mongo_client_factory = mongo_client_factory
 
     def connect_to_database(
         self,
         connection_name: str,
-        conn_manager,
-        parent_widget,
-        add_database_collections,
-    ):
+        conn_manager: Any,
+        parent_widget: QWidget,
+        add_database_collections: Any,
+    ) -> None:
         conn_data = conn_manager.get_connection_by_name(connection_name)
         if not conn_data:
             QMessageBox.critical(
@@ -107,14 +109,14 @@ class ConnectionStateManager:
         except Exception as e:
             QMessageBox.critical(parent_widget, CONNECTION_ERROR_TITLE, str(e))
 
-    def disconnect_database(self, connection_name: str, clear_database_collections):
+    def disconnect_database(self, connection_name: str, clear_database_collections: Any) -> None:
         if connection_name in self.active_clients:
             del self.active_clients[connection_name]
             clear_database_collections(connection_name)
 
 
 class ConnectionUIHandler:
-    def __init__(self, conn_manager, widget_manager, state_manager):
+    def __init__(self, conn_manager: Any, widget_manager: Any, state_manager: Any) -> None:
         self.conn_manager = conn_manager
         self.widget_manager = widget_manager
         self.state_manager = state_manager
@@ -226,7 +228,7 @@ class ConnectionUIHandler:
                         None, CONNECTION_ERROR_TITLE, f"Failed to add and connect: {e}"
                     )
 
-    def connect_to_database(self, connection_name: str):
+    def connect_to_database(self, connection_name: str) -> None:
         # This method delegates to the state manager
         parent_widget = getattr(self.widget_manager, "collection_tree", None)
         self.state_manager.connect_to_database(
@@ -238,7 +240,7 @@ class ConnectionUIHandler:
             ),
         )
 
-    def disconnect_database(self, connection_name: str):
+    def disconnect_database(self, connection_name: str) -> None:
         self.state_manager.disconnect_database(
             connection_name,
             getattr(
@@ -249,7 +251,7 @@ class ConnectionUIHandler:
 
 # Refactored mixin using composition
 class ConnectionWidgetsMixin(CollectionPanelMixin):
-    def __init__(self, mongo_client_factory):
+    def __init__(self, mongo_client_factory: Any) -> None:
         super().__init__()
         # Ensure these are initialized before use
         if not hasattr(self, "conn_manager"):
@@ -296,6 +298,3 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
 
     def disconnect_database(self, connection_name: str) -> None:
         self.ui_handler.disconnect_database(connection_name)
-
-
-# NOTE: CollectionPanelMixin is still used as a mixin. For full decoupling, consider composition in future refactors.
