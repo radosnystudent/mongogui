@@ -42,11 +42,7 @@ def run_command(command: list[str], shell: bool = False) -> bool:
 
 def main() -> None:
     """Main launcher function."""
-    print("MongoDB GUI Application Launcher")
-    print("================================")
-
     platform_type = detect_platform()
-    print(f"Detected platform: {platform_type}")
     script_dir = Path(__file__).parent / "scripts"
 
     if try_run_platform_script(platform_type, script_dir):
@@ -69,30 +65,24 @@ def try_run_platform_script(platform_type: str, script_dir: Path) -> bool:
     """Try to run the platform-specific script. Returns True if successful."""
     if platform_type == "windows":
         powershell_script = script_dir / "run.ps1"
-        print("Attempting to run PowerShell script...")
-        if powershell_script.exists():
-            if run_command(
-                [
-                    "powershell.exe",
-                    "-ExecutionPolicy",
-                    "Bypass",
-                    "-File",
-                    str(powershell_script),
-                ],
-                shell=False,
-            ):
-                return True
-        else:
-            print(f"PowerShell script not found: {powershell_script}")
+        if powershell_script.exists() and run_command(
+            [
+                "powershell.exe",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-File",
+                str(powershell_script),
+            ],
+            shell=False,
+        ):
+            return True
     elif platform_type == "unix":
         shell_script = script_dir / "run.sh"
-        print("Attempting to run shell script...")
         if shell_script.exists():
             # nosec B103: Chmod setting a permissive mask 0o755 on file (shell_script).
             # This is required to make the script executable, not a security risk in this context.
             os.chmod(shell_script, 0o755)
-            if run_command([str(shell_script)], shell=False):
-                return True
+            return run_command([str(shell_script)], shell=False)
     return False
 
 
@@ -109,29 +99,22 @@ def get_venv_executables(platform_type: str, venv_path: Path) -> tuple[Path, Pat
 
 def ensure_dependencies(pip_exe: Path) -> None:
     """Ensure all dependencies are installed."""
-    print("Checking dependencies...")
     try:
         for pkg in ["keyring", "pymongo", "PyQt5"]:
             if importlib.util.find_spec(pkg) is None:
                 raise ImportError(f"{pkg} not found")
-        print("Dependencies already installed")
     except ImportError:
-        print("Installing dependencies...")
         if not run_command([str(pip_exe), "install", "-r", "requirements.txt"]):
-            print("Failed to install dependencies")
             sys.exit(1)
 
 
 def run_application(python_exe: Path) -> None:
     """Run the main application."""
-    print("Starting MongoDB GUI...")
     try:
         subprocess.run([str(python_exe), "main.py"], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Application failed to start: {e}")
+    except subprocess.CalledProcessError:
         sys.exit(1)
     except KeyboardInterrupt:
-        print("\nApplication interrupted by user")
         sys.exit(0)
 
 

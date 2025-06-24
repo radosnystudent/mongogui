@@ -71,6 +71,10 @@ class QueryPanelMixin:
     _table_signals_connected: bool = False
     _tree_signals_connected: bool = False
     _explain_summary_widget: QWidget | None = None
+    page_size_picker: Any = None  #: Optional widget for page size selection
+    view_as_picker: Any = None  #: Optional widget for result view mode selection
+    nav_controls_widget: QWidget | None = None  #: Optional container for nav controls
+    view_switch_widget: QWidget | None = None  #: Optional container for view switcher
 
     def execute_query(self) -> None:
         """
@@ -118,50 +122,70 @@ class QueryPanelMixin:
         Display the query results in the UI, updating the table and tree widgets as needed.
         Handles empty result cases and resets UI state.
         """
-        # Reset UI state properly for query results
+        # Reset UI state and show all controls
         self._reset_ui_for_query_results()
+        self._show_control_widgets()
 
         # Connect signals for context menus
         self.setup_query_panel_signals()
 
         # Handle empty results case
         if not self.results:
-            if self.data_table:
-                self.data_table.setRowCount(0)
-            if getattr(self, "json_tree", None):
-                self.json_tree.clear()
-                self.json_tree.hide()
-            self.page_label.setText(f"Page {self.current_page + 1}")
-            self.result_count_label.setText("No results")
-            self.prev_btn.setEnabled(self.current_page > 0)
-            self.next_btn.setEnabled(False)
+            self._handle_empty_results()
             return
 
-        # Show all results for this page (already paginated)
+        # Show all results for this page
         page_results = self.results
-        self.prev_btn.setEnabled(self.current_page > 0)
-        self.next_btn.setEnabled(len(page_results) == self.page_size)
-        self.page_label.setText(f"Page {self.current_page + 1}")
-        self.result_count_label.setText(f"Showing {len(page_results)} results")
 
-        # Display results in both table and tree view
+        # Update navigation and display
+        self._update_navigation_controls(page_results)
         self.display_table_results(page_results)
         self.display_tree_results(page_results)
-
-        # Update JSON tree view
-        if getattr(self, "json_tree", None):
-            self.json_tree.clear()
-            for idx, doc in enumerate(
-                page_results, start=self.current_page * self.page_size + 1
-            ):
-                doc_item = self._add_tree_item(f"Document {idx}", doc)
-                self.json_tree.addTopLevelItem(doc_item)
-            self.json_tree.expandToDepth(1)
-            self.json_tree.show()
+        self._update_tree_view(page_results)
 
         # Hide result_display (used for testing)
         if hasattr(self, "result_display") and self.result_display is not None:
             self.result_display.hide()
+
+    def _update_navigation_controls(self, page_results: list[dict[str, Any]]) -> None:
+        """Update navigation controls with current page information."""
+        if hasattr(self, "prev_btn"):
+            self.prev_btn.setEnabled(self.current_page > 0)
+        if hasattr(self, "next_btn"):
+            self.next_btn.setEnabled(len(page_results) == self.page_size)
+        if hasattr(self, "page_label"):
+            self.page_label.setText(f"Page {self.current_page + 1}")
+        if hasattr(self, "result_count_label"):
+            self.result_count_label.setText(f"Showing {len(page_results)} results")
+
+    def _handle_empty_results(self) -> None:
+        """Handle the case when there are no results to display."""
+        if self.data_table:
+            self.data_table.setRowCount(0)
+        if getattr(self, "json_tree", None):
+            self.json_tree.clear()
+        if hasattr(self, "page_label"):
+            self.page_label.setText(f"Page {self.current_page + 1}")
+        if hasattr(self, "result_count_label"):
+            self.result_count_label.setText("No results")
+        if hasattr(self, "prev_btn"):
+            self.prev_btn.setEnabled(self.current_page > 0)
+        if hasattr(self, "next_btn"):
+            self.next_btn.setEnabled(False)
+
+    def _update_tree_view(self, page_results: list[dict[str, Any]]) -> None:
+        """Update the JSON tree view with the current results."""
+        if not getattr(self, "json_tree", None):
+            return
+
+        self.json_tree.clear()
+        for idx, doc in enumerate(
+            page_results, start=self.current_page * self.page_size + 1
+        ):
+            doc_item = self._add_tree_item(f"Document {idx}", doc)
+            self.json_tree.addTopLevelItem(doc_item)
+        self.json_tree.expandToDepth(1)
+        self.json_tree.show()
 
     def _add_tree_item(self, key: str, value: Any) -> QTreeWidgetItem:
         if isinstance(value, dict):
@@ -376,28 +400,62 @@ class QueryPanelMixin:
             return
         try:
             result = self.mongo_client.execute_query(query_text, explain=True)
-            self.display_explain_result(result)
+            if result.is_ok:
+                explain_data = result.unwrap()
+                self.display_explain_result(explain_data)
+            else:
+                self._set_db_info_label(f"Explain error: {result.unwrap_err()}")
         except Exception as e:
             self._set_db_info_label(f"Explain error: {str(e)}")
+
+    def _hide_explain_controls(self) -> None:
+        """Hide all control widgets when in explain mode."""
+        for attr in (
+            "prev_btn",
+            "next_btn",
+            "page_label",
+            "result_count_label",
+            "page_size_picker",
+            "view_as_picker",
+            "page_size_label",
+            "view_as_label",
+        ):
+            widget = getattr(self, attr, None)
+            if widget is not None and hasattr(widget, "setVisible"):
+                widget.setVisible(False)
+                if hasattr(widget, "hide"):
+                    widget.hide()
+
+        # Hide the parent containers
+        for container in ("nav_controls_widget", "view_switch_widget"):
+            widget = getattr(self, container, None)
+            if widget is not None:
+                widget.setVisible(False)
+                widget.hide()
 
     def display_explain_result(self, result: Any) -> None:
         """Display the explain plan as a tree in the Results section and show a summary box above it."""
         if not self.json_tree:
             return
 
-        # Clean up any previous state first
+        # Clean up any previous state
         self._remove_previous_summary_widget()
+        self._hide_explain_controls()
 
-        # Always hide the data table in explain mode
+        # Hide the data table
         if hasattr(self, "data_table") and self.data_table is not None:
             self.data_table.hide()
-            self.data_table.setVisible(False)  # Ensure it's really hidden
+            self.data_table.setVisible(False)
 
-        # Set up the explain view
+        # Set up and display explain view
         self._setup_explain_tree_view()
         self._hide_other_result_displays()
         self._create_summary_widget(result)
         self._display_explain_tree(result)
+
+        # Ensure tree view is visible
+        self.json_tree.update()
+        self.json_tree.show()
 
     def _setup_explain_tree_view(self) -> None:
         """Set up the tree view for explain results."""
@@ -416,34 +474,80 @@ class QueryPanelMixin:
             self.result_display.hide()
 
     def _remove_previous_summary_widget(self) -> None:
-        """Remove any existing summary widget."""
-        if hasattr(self, "_explain_summary_widget") and self._explain_summary_widget:
-            widget_to_remove = self._explain_summary_widget
-            self._explain_summary_widget = None  # Clear the reference immediately
+        """Remove any existing explain summary widget and restore normal view state."""
+        if (
+            not hasattr(self, "_explain_summary_widget")
+            or not self._explain_summary_widget
+        ):
+            return
 
-            original_parent = widget_to_remove.parentWidget()
+        widget_to_remove = self._explain_summary_widget
+        self._explain_summary_widget = None
 
-            widget_to_remove.hide()
-            # Setting parent to None should remove it from the original_parent's (e.g., QSplitter) list of children
-            widget_to_remove.setParent(None)
-            widget_to_remove.deleteLater()  # Schedule for deletion
+        # Find the splitter ancestor for proper cleanup
+        original_parent = widget_to_remove.parentWidget()
+        while original_parent and not isinstance(original_parent, QSplitter):
+            original_parent = original_parent.parentWidget()
 
-            if isinstance(original_parent, QSplitter):
-                original_parent.refresh()  # Crucial for QSplitter to update its internal state
-                # Force visual updates on the splitter
-                original_parent.updateGeometry()
-                original_parent.update()
-                if hasattr(
-                    original_parent, "repaint"
-                ):  # Should always be true for QWidget
-                    original_parent.repaint()
+        # Clean up the summary widget
+        widget_to_remove.hide()
+        widget_to_remove.setParent(None)
+        widget_to_remove.deleteLater()
 
-            # Ensure data_table is made visible as we are removing the explain summary
-            if hasattr(self, "data_table") and self.data_table is not None:
-                self.data_table.setVisible(True)
-                self.data_table.show()
-                if hasattr(self.data_table, "raise_"):
-                    self.data_table.raise_()
+        # Update splitter if found
+        if isinstance(original_parent, QSplitter):
+            original_parent.refresh()
+            original_parent.updateGeometry()
+            original_parent.update()
+            if hasattr(original_parent, "repaint"):
+                original_parent.repaint()
+
+        # Show all controls again
+        self._show_control_widgets()
+
+    def _show_widget_if_exists(self, widget_name: str) -> None:
+        """Show and make visible a widget if it exists."""
+        widget = getattr(self, widget_name, None)
+        if widget is not None:
+            widget.setVisible(True)
+            if hasattr(widget, "show"):
+                widget.show()
+
+    def _show_container_if_exists(self, container_name: str) -> None:
+        """Show and make visible a container widget if it exists, bringing it to front."""
+        container = getattr(self, container_name, None)
+        if container is not None:
+            container.setVisible(True)
+            container.show()
+            if hasattr(container, "raise_"):
+                container.raise_()
+
+    def _show_control_widgets(self) -> None:
+        """Show all control widgets and containers."""
+        # Show all individual control widgets
+        control_widgets = (
+            "prev_btn",
+            "next_btn",
+            "page_label",
+            "result_count_label",
+            "page_size_picker",
+            "view_as_picker",
+            "page_size_label",
+            "view_as_label",
+        )
+        for widget_name in control_widgets:
+            self._show_widget_if_exists(widget_name)
+
+        # Show container widgets and ensure they're in front
+        containers = ("nav_controls_widget", "view_switch_widget")
+        for container_name in containers:
+            self._show_container_if_exists(container_name)
+
+        # Show and bring data table to front
+        self._show_container_if_exists("data_table")
+
+        # Show tree view if it exists
+        self._show_widget_if_exists("json_tree")
 
     def _create_summary_widget(self, result: Any) -> None:
         """Create and display the query summary widget."""
@@ -628,42 +732,49 @@ class QueryPanelMixin:
             return f"Rejected plans: {rejected_count}"
 
     def _add_tree_item_to_tree(self, parent: QTreeWidgetItem, value: Any) -> None:
-        # Refactored to reduce cognitive complexity
+        """Add tree items for query results."""
         if isinstance(value, dict):
             for k, v in value.items():
-                self._add_tree_child(parent, k, v)
+                child = self._create_child_item(k, v)
+                parent.addChild(child)
         elif isinstance(value, list):
             for idx, v in enumerate(value):
-                self._add_tree_child(parent, f"[{idx}]", v)
+                child = self._create_child_item(f"[{idx}]", v)
+                parent.addChild(child)
 
-    def _add_tree_child(self, parent: QTreeWidgetItem, key: str, value: Any) -> None:
+    def _create_child_item(self, key: str, value: Any) -> QTreeWidgetItem:
+        """Create a new tree widget item based on the type of value."""
         if isinstance(value, dict | list):
             child = QTreeWidgetItem([str(key), ""])
-            parent.addChild(child)
             self._add_tree_item_to_tree(child, value)
-        else:
-            child = QTreeWidgetItem([str(key), str(value)])
-            parent.addChild(child)
+            return child
+        return QTreeWidgetItem([str(key), str(value)])
 
     def _reset_ui_for_query_results(self) -> None:
-        """Reset the UI state before displaying query results."""
-        # First, remove any previous summary widget. This now also handles splitter refresh.
+        """Reset UI state for displaying query results."""
+        # First, clean up any explain summary
         self._remove_previous_summary_widget()
 
-        # Make sure data_table is visible and brought to front
+        # Then show data table which gets hidden in explain mode
+        if hasattr(self, "data_table") and self.data_table is not None:
+            self.data_table.show()
+
+        # Force table visibility in case we're coming back from explain view
         if hasattr(self, "data_table") and self.data_table is not None:
             self.data_table.setVisible(True)
-            self.data_table.show()
             if hasattr(self.data_table, "raise_"):
                 self.data_table.raise_()
 
-        # Reset json_tree for display: clear and hide it.
-        # display_results will .show() it later if there's data.
-        if hasattr(self, "json_tree") and self.json_tree is not None:
-            self.json_tree.clear()
-            self.json_tree.hide()  # Explicitly hide
-
-        # Redundant parent updates removed as _remove_previous_summary_widget now handles splitter updates.
+        # Now show the navigation and view controls
+        if (
+            hasattr(self, "nav_controls_widget")
+            and self.nav_controls_widget is not None
+        ):
+            self.nav_controls_widget.show()
+            self.nav_controls_widget.setVisible(True)
+        if hasattr(self, "view_switch_widget") and self.view_switch_widget is not None:
+            self.view_switch_widget.show()
+            self.view_switch_widget.setVisible(True)
 
     def get_collection_schema_fields(
         self, db: str, collection: str, path: list[str]

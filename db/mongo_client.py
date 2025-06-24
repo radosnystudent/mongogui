@@ -356,7 +356,6 @@ class MongoClientWrapper:
         try:
             db = client[dbname]
             collection = db[collection_name]
-            # Cast to list[dict[str, Any]] for mypy compatibility
             indexes = [dict(idx) for idx in collection.list_indexes()]
             return Result.Ok(indexes)
         except Exception as e:

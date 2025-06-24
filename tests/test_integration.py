@@ -15,9 +15,6 @@ from db.mongo_client import MongoClientWrapper
 def test_mongo_client_integration() -> None:
     """Test the query preprocessor integration with MongoClientWrapper."""
 
-    print("Testing MongoDB Client Integration with Query Preprocessor")
-    print("=" * 60)
-
     # Create a MongoDB client instance
     mongo_client = MongoClientWrapper()
 
@@ -38,39 +35,24 @@ def test_mongo_client_integration() -> None:
 
     all_passed = True
 
-    for i, query in enumerate(test_queries, 1):
+    for query in test_queries:
         try:
-            print(f"Test {i}: {query}")
             # This will test the preprocessing but won't actually execute since we're not connected
             result = mongo_client.execute_query(query)
 
-            # Since we're not connected, we should get "Not connected to database"
-            if result == "Not connected to database":
-                print(
-                    f"✓ Test {i}: PASSED - Query preprocessing worked, got expected 'not connected' message"
-                )
+            # Since we're not connected, we should get a Result error with the correct message
+            if (
+                hasattr(result, "is_error")
+                and result.is_error()
+                and result.error == "Not connected to database"
+            ):
+                pass  # Test passed
             else:
-                print(f"✗ Test {i}: FAILED - Unexpected result: {result}")
                 all_passed = False
-
-        except Exception as e:
-            print(f"✗ Test {i}: ERROR - {str(e)}")
+        except Exception:
             all_passed = False
-        print()
 
-    if all_passed:
-        print("🎉 All integration tests passed!")
-        print(
-            "\nThe query preprocessor is successfully integrated with the MongoDB client."
-        )
-        print("Users can now use the user-friendly syntax:")
-        print('  - {name:"John"} instead of {"name":"John"}')
-        print(
-            '  - {$match:{status:"active"}} instead of {"$match":{"status":"active"}}'
-        )
-        print('  - Nested objects like {address:{city:"NYC"}} work correctly')
-    else:
-        print("❌ Some integration tests failed.")
+    assert all_passed, "Some integration tests failed."
 
 
 if __name__ == "__main__":

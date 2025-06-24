@@ -39,7 +39,7 @@ from utils.state_manager import StateManager, StateObserver
 NO_DB_CONNECTION_MSG = "No database connection"
 
 
-class MainWindow(QMainWindow, StateObserver):
+class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("MongoDB GUI")
@@ -71,9 +71,17 @@ class MainWindow(QMainWindow, StateObserver):
         self.connection_layout = QVBoxLayout()
 
         # Composition: instantiate helpers
-        self.connection_widgets = ConnectionWidgetsMixin()
         self.query_panel = QueryPanelMixin()
         self.collection_panel = CollectionPanelMixin()
+
+        # Initialize ConnectionWidgetsMixin
+        ConnectionWidgetsMixin.__init__(self)
+
+        # Assign ConnectionWidgetsMixin to connection_widgets
+        self.connection_widgets = self
+
+        # Ensure collection_panel attribute is always available for mixins
+        self.collection_panel = self
 
         self.setup_ui()
         self.load_connections()
@@ -96,10 +104,10 @@ class MainWindow(QMainWindow, StateObserver):
         left_layout.addWidget(open_conn_mgr_btn)
 
         # Collection tree (replaces old button list)
-        self.collection_tree = QTreeWidget()
-        self.collection_tree.setMinimumHeight(200)
-        left_layout.addWidget(self.collection_tree)
-        self.setup_collection_tree()  # Provided by CollectionPanelMixin
+        left_layout.addWidget(
+            self.collection_panel.collection_tree
+        )  # Use the mixin's tree
+        self.collection_panel.setup_collection_tree()  # Provided by CollectionPanelMixin
 
         main_layout.addWidget(left_panel)
 
@@ -230,9 +238,9 @@ class MainWindow(QMainWindow, StateObserver):
 
         # Context menu logic
         if item_type in ["collection", "index"]:
-            self.collection_tree.setCurrentItem(item)
+            self.collection_panel.collection_tree.setCurrentItem(item)
         else:
-            self.collection_tree.clearSelection()
+            self.collection_panel.collection_tree.clearSelection()
 
     def execute_query(self) -> None:
         """
@@ -379,6 +387,5 @@ class MainWindow(QMainWindow, StateObserver):
 
     # Example usage in methods:
     def connect_to_database(self, connection_name: str) -> None:
-        # Delegate to connection_widgets mixin if available
-        if hasattr(self, "connection_widgets"):
-            self.connection_widgets.connect_to_database(connection_name)
+        # Explicitly call the mixin method to avoid recursion
+        ConnectionWidgetsMixin.connect_to_database(self, connection_name)

@@ -27,6 +27,10 @@ class CollectionPanelMixin:
     query_input: Any
     collection_tree: QTreeWidget  # Added collection_tree attribute
 
+    def __init__(self) -> None:
+        super().__init__()
+        self.collection_tree = QTreeWidget()
+
     def setup_collection_tree(self) -> None:
         self.collection_tree.setColumnCount(1)
         self.collection_tree.setHeaderLabels(["Database/Collection"])
@@ -67,8 +71,8 @@ class CollectionPanelMixin:
                 col_item.addChild(dummy)
                 db_item.addChild(col_item)
             self.collection_tree.addTopLevelItem(db_item)
-        except Exception as e:
-            print(f"Error loading collections for {db_label}: {str(e)}")
+        except Exception:
+            pass
 
     def clear_database_collections(self, db_label: str) -> None:
         # Remove the top-level node for a given database
@@ -100,8 +104,8 @@ class CollectionPanelMixin:
                 )
                 col_item.addChild(QTreeWidgetItem([""]))
                 self.collection_tree.addTopLevelItem(col_item)
-        except Exception as e:
-            print(f"Error loading collections: {str(e)}")
+        except Exception:
+            pass
 
     def add_collection_widget(self, collection_name: str) -> None:
         collection_btn = QPushButton(collection_name)
@@ -136,11 +140,6 @@ class CollectionPanelMixin:
             return
         client = self._get_mongo_client_for_item(col_item)
         if not client:
-            QMessageBox.critical(
-                self.collection_tree,
-                "Error",
-                "No MongoDB connection found for this collection.",
-            )
             return
         # Remove all children
         while col_item.childCount() > 0:
@@ -150,15 +149,19 @@ class CollectionPanelMixin:
             else:
                 break
         collection_name = col_item.text(0)
-        indexes = client.list_indexes(collection_name)
-        if isinstance(indexes, str):
-            QMessageBox.critical(self.collection_tree, "Error", indexes)
+        indexes_result = client.list_indexes(collection_name)
+        if indexes_result.is_ok():
+            indexes = indexes_result.value or []
+        else:
+            QMessageBox.critical(
+                self.collection_tree, "Error", str(indexes_result.error)
+            )
             return
         try:
             if indexes:
                 for idx in indexes:
                     idx_name = idx.get("name", "")
-                    idx_item = QTreeWidgetItem([f"Index: {idx_name}"])
+                    idx_item = QTreeWidgetItem([idx_name])
                     idx_item.setData(
                         0,
                         int(Qt.ItemDataRole.UserRole),

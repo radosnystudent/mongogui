@@ -97,12 +97,17 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         close_btn.clicked.connect(self._close_tab)
         query_controls.addWidget(close_btn)
         layout.addLayout(query_controls)
-        # Results label
+        # Results section
         results_label = QLabel("Results:")
         layout.addSpacing(30)
         layout.addWidget(results_label)
+        self.result_count_label = QLabel("")
+        layout.addWidget(self.result_count_label)
+
         # Navigation
-        nav_layout = QHBoxLayout()
+        self.nav_controls_widget = QWidget()
+        nav_layout = QHBoxLayout(self.nav_controls_widget)
+        nav_layout.setContentsMargins(0, 0, 0, 0)
         self.prev_btn = QPushButton("Previous")
         self.prev_btn.clicked.connect(self.previous_page)
         self.prev_btn.setEnabled(False)
@@ -114,29 +119,39 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         self.next_btn.setEnabled(False)
         nav_layout.addWidget(self.next_btn)
         nav_layout.addStretch()
-        self.result_count_label = QLabel("")
-        nav_layout.addWidget(self.result_count_label)
         # Page size selector
+        self.page_size_label = QLabel("Page size:")
         self.page_size_combo = QComboBox()
         self.page_size_combo.addItems(["10", "20", "50", "100", "200"])
         self.page_size_combo.setCurrentText(str(self.page_size))
         self.page_size_combo.setToolTip("Results per page")
         self.page_size_combo.currentTextChanged.connect(self._on_page_size_changed)
-        nav_layout.addWidget(QLabel("Page size:"))
+        nav_layout.addWidget(self.page_size_label)
         nav_layout.addWidget(self.page_size_combo)
-        layout.addLayout(nav_layout)
-        # Results area
-        view_switch_layout = QHBoxLayout()
+        self.page_size_picker = (
+            self.page_size_combo
+        )  # For QueryPanelMixin show/hide logic
+        layout.addWidget(self.nav_controls_widget)
+
+        # View Switcher Container
+        self.view_switch_widget = QWidget()
+        view_switch_layout = QHBoxLayout(self.view_switch_widget)
+        view_switch_layout.setContentsMargins(0, 0, 0, 0)
+        self.view_as_label = QLabel("View as:")
         self.view_mode_combo = QComboBox()
         self.view_mode_combo.addItems(["Tree View", "Table View"])
         self.view_mode_combo.setCurrentIndex(0)  # Default to Tree View
         self.view_mode_combo.setToolTip("Select results view mode")
         self.view_mode_combo.currentIndexChanged.connect(self._on_view_mode_changed)
         view_switch_layout.addStretch()
-        view_switch_layout.addWidget(QLabel("View as:"))
+        view_switch_layout.addWidget(self.view_as_label)
         view_switch_layout.addWidget(self.view_mode_combo)
-        layout.addLayout(view_switch_layout)
+        self.view_as_picker = (
+            self.view_mode_combo
+        )  # For QueryPanelMixin show/hide logic
+        layout.addWidget(self.view_switch_widget)
 
+        # Results area
         results_splitter = QSplitter()
         results_splitter.setOrientation(Qt.Orientation.Vertical)
         self.results_stack = QStackedWidget()
