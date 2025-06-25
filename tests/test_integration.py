@@ -6,10 +6,10 @@ Integration test for the query preprocessor with MongoDB client.
 import os
 import sys
 
+from db.mongo_client import MongoClientWrapper
+
 # Add the project root to the Python path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from db.mongo_client import MongoClientWrapper
 
 
 def test_mongo_client_integration() -> None:

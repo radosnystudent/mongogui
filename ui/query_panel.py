@@ -25,7 +25,7 @@ from ui.edit_document_dialog import EditDocumentDialog
 from utils.error_handling import handle_exception
 
 
-def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
+def get_schema_fields_for_path(schema: dict[str, Any], path: list[str]) -> list[str]:
     """
     Given a schema dict and a path (e.g., ["covers"]), return available fields at that path.
 
@@ -35,7 +35,7 @@ def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
     Returns:
         List of available field names at the specified path.
     """
-    node = schema
+    node: Any = schema
     for part in path:
         if isinstance(node, dict) and part in node:
             node = node[part]
@@ -45,7 +45,7 @@ def get_schema_fields_for_path(schema: dict, path: list[str]) -> list[str]:
             return []
     if isinstance(node, dict):
         return list(node.keys())
-    return []  # type: ignore[unreachable]
+    return []
 
 
 class QueryPanelMixin:

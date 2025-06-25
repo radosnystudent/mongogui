@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 from PyQt5.QtCore import Qt
 from PyQt5.QtWidgets import (
@@ -17,9 +17,6 @@ from ui.collection_panel import CollectionPanelMixin
 from ui.connection_dialog import ConnectionDialog
 
 CONNECTION_ERROR_TITLE = "Connection Error"
-
-if TYPE_CHECKING:
-    from PyQt5.QtWidgets import QTextEdit
 
 
 class ConnectionWidgetsMixin(CollectionPanelMixin):

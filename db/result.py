@@ -4,13 +4,13 @@ Result pattern for consistent return types in database operations.
 This module defines a generic Result class for use in database and UI operations, following the Result pattern.
 """
 
-from typing import TypeVar
+from typing import Generic, TypeVar
 
 T = TypeVar("T")
 E = TypeVar("E")
 
 
-class Result[T, E]:
+class Result(Generic[T, E]):
     """
     Generic result type for database and UI operations.
 
