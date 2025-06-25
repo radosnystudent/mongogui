@@ -1,11 +1,11 @@
 # Development dependencies
-black>=23.0.0
-ruff>=0.1.0
-mypy>=1.0.0
-bandit>=1.7.0
-build>=0.10.0
+black>=24.2.0
+ruff>=0.3.0
+mypy>=1.9.0
+bandit>=1.7.8
+build>=1.1.1
 
 # Testing (optional but recommended)
-pytest>=7.0.0
-pytest-cov>=4.0.0
-pytest-qt
+pytest>=8.0.2
+pytest-cov>=4.1.0
+pytest-qt>=4.4.0
