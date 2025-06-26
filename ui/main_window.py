@@ -429,19 +429,24 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
                 set_minimum_heights(widget)
 
     def add_query_tab(
-        self, collection_name: str | None = None, db_label: str | None = None
+        self,
+        collection_name: str | None = None,
+        db_label: str | None = None,
+        mongo_client: Any = None,
     ) -> None:
-        mongo_client = None
+        # If mongo_client is explicitly provided, use it
+        # Otherwise, try to get it from active_clients
         active_db_label = db_label
 
-        if (
-            active_db_label
-            and hasattr(self, "active_clients")
-            and active_db_label in self.active_clients
-        ):
-            mongo_client = self.active_clients[active_db_label]
-        elif not active_db_label and self.mongo_client:
-            mongo_client = self.mongo_client
+        if mongo_client is None:
+            if (
+                active_db_label
+                and hasattr(self, "active_clients")
+                and active_db_label in self.active_clients
+            ):
+                mongo_client = self.active_clients[active_db_label]
+            elif not active_db_label and self.mongo_client:
+                mongo_client = self.mongo_client
 
         # Prevent opening a tab if no client is resolved, unless it's the initial state without any tabs.
         is_initial_empty_state = not self.query_tabs.count() and not (
@@ -493,14 +498,27 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
 
     def _handle_collection_click(self, item: QTreeWidgetItem) -> None:
         """Handles clicks on collection items in the collection tree."""
+        # Get the item data to extract the mongo_client and other information
+        data = item.data(0, Qt.ItemDataRole.UserRole + 1)
+        if not data:
+            return
+
+        # Extract mongo_client directly from the item data
+        mongo_client = data.get("mongo_client")
+        collection_name = data.get("name")
+        db_name = data.get("db")
+
+        # Use the parent item to get the db_label for display purposes
         parent_db_item = item.parent()
-        if parent_db_item:
-            db_label = parent_db_item.text(0)
-            collection_name = item.text(1) if item.columnCount() > 1 else item.text(0)
-            self.add_query_tab(collection_name=collection_name, db_label=db_label)
-        else:
-            collection_name = item.text(1) if item.columnCount() > 1 else item.text(0)
-            self.add_query_tab(collection_name=collection_name)
+        db_label = parent_db_item.text(0) if parent_db_item else db_name
+
+        # Pass both collection name and db_label to add_query_tab
+        # along with the actual mongo_client instance
+        self.add_query_tab(
+            collection_name=collection_name,
+            db_label=db_label,
+            mongo_client=mongo_client,
+        )
 
     def _handle_index_click(self, item: QTreeWidgetItem, item_name: str) -> None:
         """Handles clicks on index items in the collection tree."""
@@ -693,24 +711,27 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
     def connect_to_database(self, connection_name: str) -> None:
         """Connect to a database."""
         try:
+            # Ensure we're using the right connection data keys
             conn_data = self.conn_manager.get_connection_by_name(connection_name)
             if conn_data:
                 # Create MongoDB client wrapper
                 mongo_client = MongoClientWrapper()
 
                 # Get the database name from connection data
-                database = conn_data.get("database", "admin")
+                database = conn_data.get("database", conn_data.get("db", "admin"))
 
+                # Connect with the correct parameter names
                 if mongo_client.connect(
-                    ip=conn_data.get("host", "localhost"),
+                    ip=conn_data.get("host", conn_data.get("ip", "localhost")),
                     port=conn_data.get("port", 27017),
                     db=database,  # Use the actual database name
-                    login=conn_data.get("username"),
+                    login=conn_data.get("username", conn_data.get("login")),
                     password=conn_data.get("password"),
-                    tls=False,
+                    tls=conn_data.get("tls", False),
                 ):
+                    # Store client in both places for compatibility
                     self.mongo_client = mongo_client
-                    # Store client in active clients dictionary
+                    # Store client in active clients dictionary with the connection name as the key
                     self.active_clients[connection_name] = mongo_client
 
                     # Add the database node first
