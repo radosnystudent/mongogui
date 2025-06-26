@@ -23,21 +23,25 @@ class JsonHighlighter(QSyntaxHighlighter):
         """
         super().__init__(parent)
         self.key_format = QTextCharFormat()
-        self.key_format.setForeground(QColor("#007acc"))  # Blue for key with quotes
+        self.key_format.setForeground(
+            QColor("#6ac5ff")
+        )  # Bright blue for key with quotes
         self.value_format = QTextCharFormat()
         self.value_format.setForeground(
-            QColor("#000000")
-        )  # Black for value with quotes
+            QColor("#f0f0f0")
+        )  # Light gray/white for value with quotes
         self.punct_format = QTextCharFormat()
-        self.punct_format.setForeground(QColor("#a31515"))  # Red for : and ,
+        self.punct_format.setForeground(QColor("#ff9d00"))  # Orange for : and ,
         self.number_format = QTextCharFormat()
-        self.number_format.setForeground(QColor("#098658"))
+        self.number_format.setForeground(QColor("#59ff91"))  # Bright green for numbers
         self.bool_format = QTextCharFormat()
-        self.bool_format.setForeground(QColor("#795e26"))
+        self.bool_format.setForeground(QColor("#ffcc66"))  # Light orange for booleans
         self.null_format = QTextCharFormat()
-        self.null_format.setForeground(QColor("#795e26"))
+        self.null_format.setForeground(QColor("#ffcc66"))  # Light orange for null
         self.brace_format = QTextCharFormat()
-        self.brace_format.setForeground(QColor("#000000"))
+        self.brace_format.setForeground(
+            QColor("#f0f0f0")
+        )  # Light gray/white for braces
 
         # Pre-compile regular expressions
         self.key_regex = re.compile(r'"(\\.|[^"\\])*"(?=\s*:)')

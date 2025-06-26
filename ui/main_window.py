@@ -356,6 +356,9 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         # Connect tree click signals
         self.collection_tree.itemClicked.connect(self.on_collection_tree_item_clicked)
 
+        # Start the application in maximized mode (fullscreen but with window decorations)
+        self.showMaximized()
+
     def _configure_collection_tree(self) -> None:
         """Configure the collection tree widget with proper settings and styling."""
         from PyQt6.QtCore import QSize
@@ -843,3 +846,108 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
 
         dialog = ConnectionManagerWindow()
         dialog.exec()
+
+    def add_database_collections(self, db_label: str, mongo_client: Any) -> None:
+        """
+        Add a top-level node for the database, with its collections as children.
+        Override the mixin's method to set proper expansion state for database nodes.
+        """
+        # Add a top-level node for the database, with its collections as children
+        db_item = QTreeWidgetItem([db_label])
+        db_item.setData(
+            0,
+            Qt.ItemDataRole.UserRole + 1,
+            {"type": "database", "db": db_label, "mongo_client": mongo_client},
+        )
+        try:
+            collections = mongo_client.list_collections()
+            collections = sorted(collections)
+            for collection_name in collections:
+                col_item = QTreeWidgetItem([collection_name])
+                col_item.setData(
+                    0,
+                    Qt.ItemDataRole.UserRole + 1,
+                    {
+                        "type": "collection",
+                        "name": collection_name,
+                        "db": db_label,
+                        "mongo_client": mongo_client,
+                    },
+                )
+                # Always add a dummy child for expand arrow
+                dummy = QTreeWidgetItem([""])
+                col_item.addChild(dummy)
+                db_item.addChild(col_item)
+                # Ensure collections are collapsed by default
+                col_item.setExpanded(False)
+
+            # Add the database item to the tree
+            self.collection_tree.addTopLevelItem(db_item)
+
+            # Ensure database nodes are expanded by default
+            db_item.setExpanded(True)
+
+        except Exception as e:
+            print(f"Error adding database collections: {e}")
+
+    def reload_collection_indexes_in_tree(
+        self, col_item: QTreeWidgetItem | None
+    ) -> None:
+        """
+        Reload the indexes for a collection in the tree.
+        Override the mixin's method to ensure collections stay collapsed.
+        """
+        if col_item is None:
+            return
+        client = self._get_mongo_client_for_item(col_item)
+        if not client:
+            return
+        # Remove all children
+        while col_item.childCount() > 0:
+            child = col_item.child(0)
+            if child is not None:
+                col_item.removeChild(child)
+            else:
+                break
+        collection_name = col_item.text(0)
+        indexes_result = client.list_indexes(collection_name)
+        if indexes_result.is_ok():
+            indexes = indexes_result.value or []
+        else:
+            QMessageBox.critical(
+                self.collection_tree, "Error", str(indexes_result.error)
+            )
+            return
+        try:
+            if indexes:
+                for idx in indexes:
+                    idx_name = idx.get("name", "")
+                    idx_item = QTreeWidgetItem([idx_name])
+                    idx_item.setData(
+                        0,
+                        Qt.ItemDataRole.UserRole + 1,
+                        {"type": "index", "collection": collection_name, "index": idx},
+                    )
+                    idx_item.setExpanded(False)  # Keep indexes collapsed by default
+                    col_item.addChild(idx_item)
+        except Exception as e:
+            print(f"Error reloading collection indexes: {e}")
+
+        # Always add a dummy node if no real index children
+        if col_item.childCount() == 0:
+            col_item.addChild(QTreeWidgetItem([""]))
+
+        # Different from the mixin: DON'T expand the collection
+        # if hasattr(col_item, "setExpanded"):
+        #     col_item.setExpanded(True)  # Keep collections expanded by default
+
+    def _get_mongo_client_for_item(self, item: QTreeWidgetItem) -> Any:
+        """Helper method to get the mongo client from a tree item."""
+        current: QTreeWidgetItem | None = item
+        while current is not None:
+            data = current.data(0, Qt.ItemDataRole.UserRole + 1)
+            # Try to get mongo_client from collection node first, then parent (database)
+            if data and "mongo_client" in data:
+                return data.get("mongo_client")
+            current = current.parent()
+        return None
