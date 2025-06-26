@@ -155,7 +155,7 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
             try:
                 self.conn_manager.add_connection(conn_data)
                 self.load_connections()
-                self.connect_to_database(conn_data["name"])
+                self.connect_to_database(str(conn_data["name"]))
             except ValueError:
                 pass
 

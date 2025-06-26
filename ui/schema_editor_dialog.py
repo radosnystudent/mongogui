@@ -5,6 +5,7 @@ Provides a PyQt6 dialog for editing, validating, and formatting collection schem
 """
 
 import json
+from typing import cast
 
 from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import (
@@ -52,8 +53,8 @@ class SchemaEditorDialog(QDialog):
         self.format_button = QPushButton("Format", self)
         self.save_button = QPushButton("Save", self)
 
-        widgets = [self.text_edit, self.validation_label]
-        button_widgets: list[QWidget] = [self.format_button, self.save_button]
+        widgets = cast(list[QWidget], [self.text_edit, self.validation_label])
+        button_widgets = cast(list[QWidget], [self.format_button, self.save_button])
         setup_dialog_layout(self, widgets, button_widgets)
 
         self.format_button.clicked.connect(self.format_json)

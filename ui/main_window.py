@@ -5,7 +5,7 @@ Main application window for the MongoDB GUI.
 # This module defines the MainWindow class and related UI logic for the main application window.
 # All UI logic is separated from business logic and database operations.
 
-from typing import Any, Optional
+from typing import Any
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor, QPainter, QPen
@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QProxyStyle,
     QPushButton,
     QStyle,
+    QStyleOption,
     QTableWidget,
     QTabWidget,
     QTreeWidget,
@@ -39,7 +40,7 @@ NO_DB_CONNECTION_MSG = "No database connection"
 class TreeProxyStyle(QProxyStyle):
     """Custom style proxy to control tree branch indicator appearance in PyQt6."""
 
-    def __init__(self, style=None):
+    def __init__(self, style: QStyle | None = None) -> None:
         """Initialize with optional base style."""
         super().__init__(style)
         # Define a bright indicator color for maximum visibility
@@ -47,7 +48,13 @@ class TreeProxyStyle(QProxyStyle):
         self.indicator_color = QColor("#FFFFFF")
         self.indicator_size = 4  # Smaller size to match Connection Manager window
 
-    def drawPrimitive(self, element, option, painter, widget=None):
+    def drawPrimitive(
+        self,
+        element: QStyle.PrimitiveElement,
+        option: QStyleOption | None,
+        painter: QPainter | None,
+        widget: QWidget | None = None,
+    ) -> None:
         """Draw custom branch indicators for tree items."""
         # Handle tree branch indicators
         if element == QStyle.PrimitiveElement.PE_IndicatorBranch:
@@ -120,7 +127,12 @@ class TreeProxyStyle(QProxyStyle):
         # For other elements, use the base style
         super().drawPrimitive(element, option, painter, widget)
 
-    def pixelMetric(self, metric, option=None, widget=None):
+    def pixelMetric(
+        self,
+        metric: QStyle.PixelMetric,
+        option: QStyleOption | None = None,
+        widget: QWidget | None = None,
+    ) -> int:
         """Adjust indicator sizes for better visibility."""
         if metric == QStyle.PixelMetric.PM_TreeViewIndentation:
             # Use smaller indentation to match Connection Manager style
@@ -145,7 +157,7 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         self.page_size = 10
         self.mongo_client = None
         self.active_clients = {}
-        self._table_row_docs = []
+        self._table_row_docs: list[dict[str, Any]] = []
         self.prev_btn = None
         self.next_btn = None
         self.page_label = None
@@ -186,7 +198,7 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         self.page_size = 10
         self.mongo_client = None
         self.active_clients = {}
-        self._table_row_docs = []
+        # self._table_row_docs: list[dict[str, Any]] = []  # REMOVE this duplicate
         self.prev_btn = None
         self.next_btn = None
         self.page_label = None
@@ -780,7 +792,7 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
 
     def _find_collection_item(
         self, db_name: str, collection_name: str
-    ) -> Optional[QTreeWidgetItem]:
+    ) -> QTreeWidgetItem | None:
         """Find a collection item in the tree by database and collection names."""
         for i in range(self.collection_tree.topLevelItemCount()):
             db_item = self.collection_tree.topLevelItem(i)

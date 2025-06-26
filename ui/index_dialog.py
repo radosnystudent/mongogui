@@ -91,8 +91,10 @@ class IndexDialog(QDialog):
         self.selected_index_name: str | None = None  # Track the selected index name
         self.populate_table()
 
-    def show_dialog(self, dialog_class, *args, **kwargs) -> tuple[int, Any]:
-        dialog = dialog_class(*args, parent=self, **kwargs)
+    def show_dialog(
+        self, dialog_class: type[QDialog], *args: object, **kwargs: object
+    ) -> tuple[int, Any]:
+        dialog = dialog_class(*args, parent=self, **kwargs)  # type: ignore[misc, arg-type]
         result = dialog.exec()
         return result, dialog
 

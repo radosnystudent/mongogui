@@ -17,7 +17,7 @@ class ConnectionDialog(QDialog):
         self.setWindowTitle("New Connection")
         self.setMinimumWidth(400)
         self.setWindowFlags(
-            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint  # type: ignore
+            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
         )
         self.name_input = QLineEdit()
         self.db_input = QLineEdit()
@@ -77,3 +77,15 @@ class ConnectionDialog(QDialog):
 
     def get_result(self) -> tuple[str, str, str, str, str, str, bool] | None:
         return self.connection_result
+
+    def get_connection_data(self) -> dict[str, str | bool]:
+        """Return the connection data as a dictionary."""
+        return {
+            "name": self.name_input.text().strip(),
+            "db": self.db_input.text().strip(),
+            "ip": self.ip_input.text().strip(),
+            "port": self.port_input.text().strip(),
+            "login": self.login_input.text().strip(),
+            "password": self.password_input.text().strip(),
+            "tls": self.tls_checkbox.isChecked(),
+        }

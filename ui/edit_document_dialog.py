@@ -5,6 +5,7 @@ Provides a PyQt6 dialog for editing, validating, and formatting a document.
 """
 
 import json
+from typing import cast
 
 from PyQt6.QtGui import QShowEvent
 from PyQt6.QtWidgets import (
@@ -55,12 +56,11 @@ class EditDocumentDialog(QDialog):
         self.cancel_btn = QPushButton("Cancel")
 
         # Set up layout using helper
-        widgets = [self.text_edit, self.validation_label]
-        button_widgets: list[QWidget] = [
-            self.format_btn,
-            self.save_btn,
-            self.cancel_btn,
-        ]
+        widgets = cast(list[QWidget], [self.text_edit, self.validation_label])
+        button_widgets = cast(
+            list[QWidget],
+            [self.format_btn, self.save_btn, self.cancel_btn],
+        )
         setup_dialog_layout(self, widgets, button_widgets)
 
         # Connect signals

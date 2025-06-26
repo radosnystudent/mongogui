@@ -291,25 +291,26 @@ class ConnectionManagerWindow(QDialog):
             folder_item = QTreeWidgetItem([name, "", "", "", ""])
             self.tree.addTopLevelItem(folder_item)
 
-    def show_dialog(self, dialog_class, *args, **kwargs):
-        dlg = dialog_class(*args, parent=self, **kwargs)
+    def show_dialog(
+        self, dialog_class: type[QDialog], *args: object, **kwargs: object
+    ) -> tuple[int, QDialog]:
+        dlg = dialog_class(*args, parent=self, **kwargs)  # type: ignore[misc, arg-type]
         result = dlg.exec()
         return result, dlg
 
     def confirm_delete(self, name: str) -> bool:
         reply = QMessageBox.question(
             self,
-            "Confirm Delete",
-            f"Are you sure you want to delete the connection '{name}'?",
+            f"Delete {name}?",
+            f"Are you sure you want to delete {name}?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
         )
-        return reply == QMessageBox.StandardButton.Yes and bool(name)
+        return reply == QMessageBox.StandardButton.Yes
 
     def handle_new_connection(self) -> None:
         result, dlg = self.show_dialog(ConnectionDialog)
         if result == QDialog.DialogCode.Accepted:
-            name, db, ip, port, login, password, tls = dlg.get_result()
+            name, db, ip, port, login, password, tls = dlg.get_result()  # type: ignore[attr-defined]
             now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
             self.conn_manager.add_connection(
                 name, db, ip, int(port), login, password, tls
@@ -329,7 +330,7 @@ class ConnectionManagerWindow(QDialog):
             return
         result, dlg = self.show_dialog(ConnectionDialog, conn=conn)
         if result == QDialog.DialogCode.Accepted:
-            name, db, ip, port, login, password, tls = dlg.get_result()
+            name, db, ip, port, login, password, tls = dlg.get_result()  # type: ignore[attr-defined]
             now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
             self.conn_manager.update_connection(
                 conn["name"], db, ip, int(port), login, password, tls, new_name=name
