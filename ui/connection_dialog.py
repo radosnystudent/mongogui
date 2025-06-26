@@ -1,5 +1,5 @@
-﻿from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+﻿from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
     QLabel,
@@ -17,7 +17,7 @@ class ConnectionDialog(QDialog):
         self.setWindowTitle("New Connection")
         self.setMinimumWidth(400)
         self.setWindowFlags(
-            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint  # type: ignore
+            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
         )
         self.name_input = QLineEdit()
         self.db_input = QLineEdit()
@@ -25,7 +25,7 @@ class ConnectionDialog(QDialog):
         self.port_input = QLineEdit()
         self.login_input = QLineEdit()
         self.password_input = QLineEdit()
-        self.password_input.setEchoMode(QLineEdit.Password)
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
         self.show_password_checkbox = QCheckBox("Show Password")
         self.tls_checkbox = QCheckBox("Use TLS/SSL")
         self.ok_btn = QPushButton("OK")
@@ -59,9 +59,9 @@ class ConnectionDialog(QDialog):
 
     def toggle_password_visibility(self, state: int) -> None:
         if self.show_password_checkbox.isChecked():
-            self.password_input.setEchoMode(QLineEdit.Normal)
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Normal)
         else:
-            self.password_input.setEchoMode(QLineEdit.Password)
+            self.password_input.setEchoMode(QLineEdit.EchoMode.Password)
 
     def accept(self) -> None:
         name = self.name_input.text().strip()
@@ -77,3 +77,15 @@ class ConnectionDialog(QDialog):
 
     def get_result(self) -> tuple[str, str, str, str, str, str, bool] | None:
         return self.connection_result
+
+    def get_connection_data(self) -> dict[str, str | bool]:
+        """Return the connection data as a dictionary."""
+        return {
+            "name": self.name_input.text().strip(),
+            "db": self.db_input.text().strip(),
+            "ip": self.ip_input.text().strip(),
+            "port": self.port_input.text().strip(),
+            "login": self.login_input.text().strip(),
+            "password": self.password_input.text().strip(),
+            "tls": self.tls_checkbox.isChecked(),
+        }

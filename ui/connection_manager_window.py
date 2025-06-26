@@ -3,10 +3,9 @@ import json
 import os
 from typing import Any
 
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QGuiApplication
-from PyQt5.QtWidgets import (
-    QAction,
+from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtGui import QAction, QGuiApplication
+from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
     QMessageBox,
@@ -26,7 +25,7 @@ TO_URI_LABEL = "To URI"
 
 
 class ConnectionManagerWindow(QDialog):
-    connection_selected = pyqtSignal(str)  # connection name
+    connection_selected = pyqtSignal(str)  # Only emitting the connection name
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -95,14 +94,14 @@ class ConnectionManagerWindow(QDialog):
                     str(last_modified),
                 ]
             )
-            item.setData(0, int(Qt.ItemDataRole.UserRole), conn)
+            item.setData(0, Qt.ItemDataRole.UserRole + 1, conn)
             root.addChild(item)
         self.tree.addTopLevelItem(root)
         self.tree.expandAll()
 
     def add_connection(self) -> None:
         dlg = ConnectionDialog(self)
-        if dlg.exec_() == QDialog.Accepted:
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
@@ -125,7 +124,7 @@ class ConnectionManagerWindow(QDialog):
     def get_selected_connection(self) -> dict[str, Any] | None:
         item = self.tree.currentItem()
         if item and item.parent():
-            data = item.data(0, int(Qt.ItemDataRole.UserRole))
+            data = item.data(0, Qt.ItemDataRole.UserRole + 1)
             if isinstance(data, dict):
                 return data
             return None
@@ -144,7 +143,7 @@ class ConnectionManagerWindow(QDialog):
         dlg.login_input.setText(conn.get("login", ""))
         dlg.password_input.setText(conn.get("password", ""))
         dlg.tls_checkbox.setChecked(conn.get("tls", False))
-        if dlg.exec_() == QDialog.Accepted:
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             result = dlg.get_result() if hasattr(dlg, "get_result") else None
             if result:
                 name, db, ip, port, login, password, tls = result
@@ -173,9 +172,9 @@ class ConnectionManagerWindow(QDialog):
             self,
             "Delete Connection",
             f"Delete connection '{name}'?",
-            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
-        if reply == QMessageBox.Yes and name:
+        if reply == QMessageBox.StandardButton.Yes and name:
             self.conn_manager.remove_connection(name)
             self.load_connections()
 
@@ -291,3 +290,56 @@ class ConnectionManagerWindow(QDialog):
         if ok and name:
             folder_item = QTreeWidgetItem([name, "", "", "", ""])
             self.tree.addTopLevelItem(folder_item)
+
+    def show_dialog(
+        self, dialog_class: type[QDialog], *args: object, **kwargs: object
+    ) -> tuple[int, QDialog]:
+        dlg = dialog_class(*args, parent=self, **kwargs)  # type: ignore[misc, arg-type]
+        result = dlg.exec()
+        return result, dlg
+
+    def confirm_delete(self, name: str) -> bool:
+        reply = QMessageBox.question(
+            self,
+            f"Delete {name}?",
+            f"Are you sure you want to delete {name}?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        return reply == QMessageBox.StandardButton.Yes
+
+    def handle_new_connection(self) -> None:
+        result, dlg = self.show_dialog(ConnectionDialog)
+        if result == QDialog.DialogCode.Accepted:
+            name, db, ip, port, login, password, tls = dlg.get_result()  # type: ignore[attr-defined]
+            now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
+            self.conn_manager.add_connection(
+                name, db, ip, int(port), login, password, tls
+            )
+            path = os.path.join(self.conn_manager.storage_path, f"{name}.json")
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            data["last_connected"] = ""
+            data["last_modified"] = now
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            self.load_connections()
+
+    def handle_edit_connection(self, name: str) -> None:
+        conn = self.conn_manager.get_connection_by_name(name)
+        if not conn:
+            return
+        result, dlg = self.show_dialog(ConnectionDialog, conn=conn)
+        if result == QDialog.DialogCode.Accepted:
+            name, db, ip, port, login, password, tls = dlg.get_result()  # type: ignore[attr-defined]
+            now = datetime.datetime.now().isoformat(sep=" ", timespec="seconds")
+            self.conn_manager.update_connection(
+                conn["name"], db, ip, int(port), login, password, tls, new_name=name
+            )
+            path = os.path.join(self.conn_manager.storage_path, f"{name}.json")
+            with open(path, encoding="utf-8") as f:
+                data = json.load(f)
+            data["last_connected"] = data.get("last_connected", "")
+            data["last_modified"] = now
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+            self.load_connections()

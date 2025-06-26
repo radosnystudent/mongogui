@@ -1,7 +1,7 @@
 from typing import Any
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
     QDialog,
     QLabel,
     QMenu,
@@ -84,7 +84,7 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
         duplicate_action = menu.addAction("Duplicate")
         remove_action = menu.addAction("Remove")
 
-        action = menu.exec_(widget.mapToGlobal(pos))
+        action = menu.exec(widget.mapToGlobal(pos))
 
         if action == edit_action:
             self.edit_connection(name)
@@ -95,7 +95,7 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
 
     def add_connection(self) -> None:
         dialog = ConnectionDialog(None)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             conn_data = dialog.get_connection_data()
             try:
                 self.conn_manager.add_connection(conn_data)
@@ -115,7 +115,7 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
         dialog.login_input.setText(conn_data.get("login", ""))
         dialog.password_input.setText(conn_data.get("password", ""))
         dialog.tls_checkbox.setChecked(conn_data.get("tls", False))
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             updated_data = dialog.get_connection_data()
             try:
                 self.conn_manager.update_connection(
@@ -150,12 +150,12 @@ class ConnectionWidgetsMixin(CollectionPanelMixin):
 
     def edit_and_connect(self) -> None:
         dialog = ConnectionDialog(None)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             conn_data = dialog.get_connection_data()
             try:
                 self.conn_manager.add_connection(conn_data)
                 self.load_connections()
-                self.connect_to_database(conn_data["name"])
+                self.connect_to_database(str(conn_data["name"]))
             except ValueError:
                 pass
 

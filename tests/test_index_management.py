@@ -4,7 +4,7 @@ from collections.abc import Generator
 from typing import cast
 
 import pytest
-from PyQt5.QtWidgets import QApplication, QDialog
+from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox, QTableWidget
 
 from ui.index_dialog import IndexDialog, IndexEditDialog
 
@@ -15,25 +15,42 @@ def app() -> Generator[object]:
     yield app
 
 
-def test_index_dialog_add_edit_remove(app: QApplication) -> None:
-    # Patch exec_ for all dialogs to auto-accept
+def _setup_dialog_mocks() -> None:
+    """Set up dialog-related mock functions."""
+
     def auto_accept(self: object) -> int:  # type: ignore
-        return QDialog.Accepted  # type: ignore[return-value]
+        return QDialog.DialogCode.Accepted  # type: ignore[return-value]
 
-    IndexDialog.exec_ = cast(object, auto_accept)  # type: ignore
-    IndexEditDialog.exec_ = cast(object, auto_accept)  # type: ignore
+    def mock_question(*args, **kwargs) -> QMessageBox.StandardButton:
+        return QMessageBox.StandardButton.Yes
 
+    IndexDialog.exec = cast(object, auto_accept)  # type: ignore
+    IndexEditDialog.exec = cast(object, auto_accept)  # type: ignore
+    QMessageBox.question = staticmethod(mock_question)  # type: ignore
+
+
+def _find_and_select_row(table: QTableWidget, name: str) -> None:
+    """Find and select a row in the table by index name."""
+    for row in range(table.rowCount()):
+        if (item := table.item(row, 0)) and item.text() == name:
+            table.selectRow(row)
+            break
+
+
+def test_index_dialog_add_edit_remove(app: QApplication) -> None:
+    _setup_dialog_mocks()
+
+    # Initialize dialog with test data
     indexes = [
         {"name": "_id_", "key": [["_id", 1]], "unique": True},
         {"name": "idx1", "key": [["field1", 1]], "unique": False},
     ]
     dlg = IndexDialog(indexes)
-    # Simulate add
-    dlg.add_index_dialog()
-    edit = dlg.findChild(IndexEditDialog)
-    if edit:
-        edit.name_edit.setText("idx2")
-        # Add field2 as an ascending index
+
+    # Test adding a new index
+    dlg.add_index()
+    if edit := dlg.findChild(IndexEditDialog):
+        edit.name_input.setText("idx2")
         edit.field_name_edit.setText("field2")
         edit.index_type_combo.setCurrentText("1 (asc)")
         edit.add_field_btn.click()
@@ -41,13 +58,15 @@ def test_index_dialog_add_edit_remove(app: QApplication) -> None:
         edit.accept()
         data = edit.get_index_data()
         assert data is not None and data["name"] == "idx2"
-    # Simulate select and remove
-    dlg.selected_index_name = "idx1"
-    dlg.remove_index()
+
+    # Test deleting an index
+    _find_and_select_row(dlg.table, "idx1")
+    dlg.delete_index()
     assert dlg.get_selected_index_name() is None
-    # Simulate edit
-    dlg.selected_index_name = "_id_"
-    dlg.edit_index_dialog()
+
+    # Test editing an index
+    _find_and_select_row(dlg.table, "_id_")
+    dlg.edit_index()
     edit2 = dlg.findChild(IndexEditDialog)
     if edit2:
         # Remove all existing fields

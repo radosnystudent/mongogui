@@ -84,10 +84,8 @@ class MongoClientWrapper:
             True if connection is successful, False otherwise.
         """
         try:
-            if login and password:
-                uri = f"mongodb://{login}:{password}@{ip}:{port}/{db}"
-            else:
-                uri = f"mongodb://{ip}:{port}/{db}"
+            auth_part = f"{login}:{password}@" if login and password else ""
+            uri = f"mongodb://{auth_part}{ip}:{port}/{db}"
 
             options: dict[str, Any] = {}
             if tls:
@@ -120,7 +118,8 @@ class MongoClientWrapper:
             return []
         try:
             db = client[dbname]
-            return db.list_collection_names()
+            collections = db.list_collection_names()
+            return collections
         except Exception:
             return []
 
@@ -331,10 +330,24 @@ class MongoClientWrapper:
         try:
             db = client[dbname]
             collection = db[collection_name]
+
+            # Ensure we're using the right _id format
             doc_id = convert_to_object_id(doc_id)
-            result = collection.replace_one({"_id": doc_id}, new_doc)
+
+            # Make a copy of the document to avoid modifying the original
+            doc_copy = dict(new_doc)
+
+            # Handle the _id field properly
+            if "_id" in doc_copy:
+                # Remove the _id from the update document - we don't need to use it
+                doc_copy.pop("_id")
+                # We'll use the doc_id parameter instead which is already converted
+
+            # Use update_one with $set to preserve the _id and update only the changed fields
+            result = collection.update_one({"_id": doc_id}, {"$set": doc_copy})
             return result.modified_count > 0
-        except Exception:
+        except Exception as e:
+            print(f"Document update error: {str(e)}")  # Print the error for debugging
             return False
 
     @require_connection

@@ -1,0 +1,24 @@
+# Set default behavior to automatically normalize line endings.
+* text=auto
+
+# Python files should always use LF line endings
+*.py text eol=lf
+*.pyw text eol=lf
+*.pyx text eol=lf
+*.pxd text eol=lf
+
+# Force batch scripts to always use CRLF line endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Force bash scripts to always use LF line endings
+*.sh text eol=lf
+
+# Text files
+*.md text
+*.txt text
+*.json text
+*.yaml text
+*.yml text
+*.toml text
