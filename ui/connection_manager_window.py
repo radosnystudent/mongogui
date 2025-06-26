@@ -25,7 +25,7 @@ TO_URI_LABEL = "To URI"
 
 
 class ConnectionManagerWindow(QDialog):
-    connection_selected = pyqtSignal(str, str, str, str, str, str, bool)
+    connection_selected = pyqtSignal(str)  # Only emitting the connection name
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)

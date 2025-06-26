@@ -84,10 +84,9 @@ class MongoClientWrapper:
             True if connection is successful, False otherwise.
         """
         try:
-            if login and password:
-                uri = f"mongodb://{login}:{password}@{ip}:{port}/{db}"
-            else:
-                uri = f"mongodb://{ip}:{port}/{db}"
+            auth_part = f"{login}:{password}@" if login and password else ""
+            uri = f"mongodb://{auth_part}{ip}:{port}/{db}"
+            print(f"Connecting to MongoDB with URI: {uri} (password hidden)")
 
             options: dict[str, Any] = {}
             if tls:
@@ -113,15 +112,22 @@ class MongoClientWrapper:
             List of collection names, or empty list if not connected or error occurs.
         """
         if not self._require_connection():
+            print(
+                f"MongoClient not connected. Client: {self.client}, DB: {self.current_db}"
+            )
             return []
         client = self.client
         dbname = self.current_db
         if client is None or not dbname:
+            print(f"Missing client or dbname. Client: {client}, DB: {dbname}")
             return []
         try:
             db = client[dbname]
-            return db.list_collection_names()
-        except Exception:
+            collections = db.list_collection_names()
+            print(f"Found collections in {dbname}: {collections}")
+            return collections
+        except Exception as e:
+            print(f"Error listing collections: {str(e)}")
             return []
 
     @require_connection_result

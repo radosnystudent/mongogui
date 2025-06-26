@@ -20,15 +20,14 @@ from ui.index_dialog import IndexDialog, IndexEditDialog
 from ui.schema_editor_dialog import SchemaEditorDialog
 
 
-class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
+class CollectionPanelMixin:  # Remove QWidget inheritance, it's not needed for a mixin
     collection_layout: QVBoxLayout
     mongo_client: Any
     result_display: QTextEdit | None = None
     query_input: Any
-    collection_tree: QTreeWidget  # Added collection_tree attribute
+    collection_tree: QTreeWidget
 
     def __init__(self) -> None:
-        super().__init__()
         self.collection_tree = QTreeWidget()
         self.setup_collection_tree()
 
@@ -168,6 +167,7 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
                         Qt.ItemDataRole.UserRole + 1,
                         {"type": "index", "collection": collection_name, "index": idx},
                     )
+                    idx_item.setExpanded(False)  # Keep indexes collapsed by default
                     col_item.addChild(idx_item)
         except Exception:
             pass
@@ -175,7 +175,7 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
         if col_item.childCount() == 0:
             col_item.addChild(QTreeWidgetItem([""]))
         if hasattr(col_item, "setExpanded"):
-            col_item.setExpanded(True)
+            col_item.setExpanded(True)  # Keep collections expanded by default
 
     def _add_index_items_to_collection(
         self, col_item: QTreeWidgetItem, collection_name: str, indexes: list[dict]
@@ -240,7 +240,11 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
         collection_name: str,
         col_item: QTreeWidgetItem | None,
     ) -> None:
-        dlg = IndexDialog(indexes, self)  # Change parent to self
+        # Find the QWidget parent
+        parent = None
+        if isinstance(self, QWidget):
+            parent = self
+        dlg = IndexDialog(indexes, parent)
         result = dlg.exec()
         if result == QDialog.DialogCode.Accepted:
             data = dlg.get_index_data()
@@ -283,7 +287,10 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
         return {k: v for k, v in data.items() if k not in ("key", "name")}
 
     def show_edit_index_dialog(self, collection_name: str, index_dict: dict) -> None:
-        dlg = IndexEditDialog(index_dict, self)  # Change parent to self
+        parent = None
+        if isinstance(self, QWidget):
+            parent = self
+        dlg = IndexEditDialog(index_dict, parent)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             data = dlg.get_index_data()
             if data:
@@ -366,7 +373,10 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
                     self.collection_tree, "Error reading schema file", str(e)
                 )
                 return
-        dlg = SchemaEditorDialog(self, initial_schema)  # Change parent to self
+        parent = None
+        if isinstance(self, QWidget):
+            parent = self
+        dlg = SchemaEditorDialog(parent, initial_schema)
         if dlg.exec() == QDialog.DialogCode.Accepted:
             try:
                 with open(schema_path, "w", encoding="utf-8") as f:
