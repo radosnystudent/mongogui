@@ -94,7 +94,7 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
                 col_item = QTreeWidgetItem([collection_name])
                 col_item.setData(
                     0,
-                    int(Qt.ItemDataRole.UserRole),
+                    Qt.ItemDataRole.UserRole + 1,
                     {
                         "type": "collection",
                         "name": collection_name,
@@ -116,14 +116,14 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
     def _get_mongo_client_for_item(self, item: QTreeWidgetItem) -> Any:
         current: QTreeWidgetItem | None = item
         while current is not None:
-            data = current.data(0, int(Qt.ItemDataRole.UserRole))
+            data = current.data(0, Qt.ItemDataRole.UserRole + 1)
             # Try to get mongo_client from collection node first, then parent (database)
             if data and "mongo_client" in data:
                 return data.get("mongo_client")
             current = current.parent()
 
     def on_collection_tree_item_expanded(self, item: QTreeWidgetItem) -> None:
-        data = item.data(0, int(Qt.ItemDataRole.UserRole))
+        data = item.data(0, Qt.ItemDataRole.UserRole + 1)
         if data and data.get("type") == "collection" and item.childCount() == 1:
             only_child = item.child(0)
             if only_child is not None and only_child.text(0) == "":
@@ -163,7 +163,7 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
                     idx_item = QTreeWidgetItem([idx_name])
                     idx_item.setData(
                         0,
-                        int(Qt.ItemDataRole.UserRole),
+                        Qt.ItemDataRole.UserRole + 1,
                         {"type": "index", "collection": collection_name, "index": idx},
                     )
                     col_item.addChild(idx_item)
@@ -184,7 +184,7 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
             idx_item = QTreeWidgetItem(["Index", idx_name])
             idx_item.setData(
                 0,
-                int(Qt.ItemDataRole.UserRole),
+                Qt.ItemDataRole.UserRole + 1,
                 {"type": "index", "collection": collection_name, "index": idx},
             )
             col_item.addChild(idx_item)
@@ -320,7 +320,7 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
         item = self.collection_tree.itemAt(pos)
         if not item:
             return
-        data = item.data(0, int(Qt.ItemDataRole.UserRole))
+        data = item.data(0, Qt.ItemDataRole.UserRole + 1)
         menu = QMenu(self.collection_tree)
         viewport = self.collection_tree.viewport()
         if data and data.get("type") == "collection":

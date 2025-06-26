@@ -125,7 +125,7 @@ class ConnectionManagerWindow(QDialog):
     def get_selected_connection(self) -> dict[str, Any] | None:
         item = self.tree.currentItem()
         if item and item.parent():
-            data = item.data(0, int(Qt.ItemDataRole.UserRole))
+            data = item.data(0, Qt.ItemDataRole.UserRole + 1)
             if isinstance(data, dict):
                 return data
             return None

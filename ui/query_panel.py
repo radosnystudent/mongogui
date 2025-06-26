@@ -295,7 +295,7 @@ class QueryPanelMixin:
             doc_item = QTreeWidgetItem(self.json_tree, [str(doc_id), ""])
             self.add_tree_item(doc_item, doc)
             doc_item.setExpanded(False)
-            doc_item.setData(0, int(Qt.ItemDataRole.UserRole), doc)
+            doc_item.setData(0, Qt.ItemDataRole.UserRole + 1, doc)
         self.json_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
     def show_tree_context_menu(self, pos: Any) -> None:
@@ -317,7 +317,7 @@ class QueryPanelMixin:
             )
             action = menu.exec(global_pos)
             if action == edit_action:
-                doc = item.data(0, Qt.ItemDataRole.UserRole)
+                doc = item.data(0, Qt.ItemDataRole.UserRole + 1)
                 if doc:
                     self.edit_document(doc)
 
