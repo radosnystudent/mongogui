@@ -41,6 +41,19 @@ clean_build() {
     echo -e "${GREEN}✓ Build artifacts cleaned${NC}"
 }
 
+# Function to normalize line endings
+normalize_line_endings() {
+    echo -e "${YELLOW}Normalizing line endings...${NC}"
+    
+    # Ensure .gitattributes is applied
+    git add --renormalize .
+    
+    # Force Python files to use LF line endings
+    find . -name "*.py" -type f -print0 | xargs -0 dos2unix -q
+    
+    echo -e "${GREEN}✓ Line endings normalized${NC}"
+}
+
 # Function to run quality checks
 run_checks() {
     echo -e "${YELLOW}Running quality checks...${NC}"
@@ -152,6 +165,9 @@ echo "=========================="
 if [ "$CLEAN" = true ]; then
     clean_build
 fi
+
+# Normalize line endings
+normalize_line_endings
 
 # Run quality checks
 if ! run_checks; then
