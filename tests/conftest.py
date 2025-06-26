@@ -37,5 +37,4 @@ def qapp(
 
     yield app
 
-    # Clean up after tests
     app.quit()
