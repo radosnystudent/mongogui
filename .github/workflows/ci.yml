@@ -24,7 +24,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Format check with Black
@@ -43,7 +43,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxkbcommon-x11-0 libxcb-xinerama0
+          sudo apt-get install -y libxkbcommon-x11-0 libxcb-xinerama0 libegl1 libgl1-mesa-glx libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libgl1-mesa-dev libegl1-mesa libxkbcommon-dev libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 xvfb
 
       # Start MongoDB service for Linux (using container action)
       - name: Start MongoDB (Linux)
@@ -112,7 +112,10 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             export QT_QPA_PLATFORM=offscreen
-            xvfb-run -a pytest --cov=. --cov-report=xml
+            export XDG_RUNTIME_DIR=/tmp/runtime-runner
+            mkdir -p $XDG_RUNTIME_DIR
+            export DISPLAY=:99
+            xvfb-run -a --server-args="-screen 0 1280x800x24" pytest --cov=. --cov-report=xml
           else
             pytest --cov=. --cov-report=xml
           fi
