@@ -4,7 +4,6 @@ Main application window for the MongoDB GUI.
 
 # This module defines the MainWindow class and related UI logic for the main application window.
 # All UI logic is separated from business logic and database operations.
-# Use composition and the Observer pattern for state management.
 
 from typing import Any
 
@@ -18,6 +17,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMessageBox,
     QProxyStyle,
+    QPushButton,
     QStyle,
     QTableWidget,
     QTableWidgetItem,
@@ -65,23 +65,25 @@ class TreeProxyStyle(QProxyStyle):
                 if has_children:
                     # Save painter state
                     painter.save()
-                    painter.setRenderHint(QPainter.RenderHint.Antialiasing)                    # Set up a thinner pen for smaller arrows
+                    painter.setRenderHint(
+                        QPainter.RenderHint.Antialiasing
+                    )  # Set up a thinner pen for smaller arrows
                     painter.setPen(QPen(self.indicator_color, 1.0))
-                    
+
                     # Calculate center position
                     center_x = rect.x() + rect.width() // 2
                     center_y = rect.y() + rect.height() // 2
                     size = self.indicator_size
-                    
+
                     # Check if the node is expanded or collapsed
                     is_open = bool(state & QStyle.StateFlag.State_Open)
-                    
+
                     # Draw arrow based on expanded/collapsed state
                     if is_open:
                         # Draw downward-pointing arrow (V shape)
                         # Don't use fill for arrow shapes
                         painter.setBrush(Qt.BrushStyle.NoBrush)
-                        
+
                         # Make the downward arrow a bit wider than tall for better proportions
                         painter.drawLine(
                             center_x - size - 1,
@@ -95,12 +97,12 @@ class TreeProxyStyle(QProxyStyle):
                             center_x + size + 1,
                             center_y - size // 2,
                         )  # Right diagonal
-                        
+
                     else:
                         # Draw rightward-pointing arrow (> shape)
                         # Don't use fill for arrow shapes
                         painter.setBrush(Qt.BrushStyle.NoBrush)
-                        
+
                         # Make the right arrow a bit taller than wide for better proportions
                         painter.drawLine(
                             center_x - size // 2,
@@ -214,9 +216,48 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Add Connections button
+        connections_button = QPushButton("Connections")
+        connections_button.clicked.connect(self.open_connection_manager_window)
+        connections_button.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #3d3d3d;
+                color: #ffffff;
+                border: 1px solid #555555;
+                padding: 5px;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #4d4d4d;
+            }
+            QPushButton:pressed {
+                background-color: #2d2d2d;
+            }
+        """
+        )
+        # Button is now properly styled
+
+        left_layout.addWidget(connections_button)
+        left_layout.addSpacing(
+            10
+        )  # Increased spacing between button and section label for better separation
+
         # Create a label for the database/collection section
         db_section_label = QLabel("Database/Collection")
+        db_section_label.setStyleSheet(
+            """
+            QLabel {
+                color: #ffffff;
+                font-weight: bold;
+                padding: 5px;
+                background-color: #3d3d3d;
+                border-radius: 3px;
+            }
+        """
+        )
         left_layout.addWidget(db_section_label)
+        left_layout.addSpacing(10)  # Add spacing after the section label
 
         # Add collection tree with proper configuration
         if hasattr(self, "collection_tree"):
@@ -224,7 +265,9 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
             self.collection_tree.setHeaderHidden(True)  # Hide the header
             self.collection_tree.setColumnCount(1)
             self.collection_tree.setMinimumHeight(200)
-            self.collection_tree.setIndentation(20)  # Set smaller indentation to match Connection Manager
+            self.collection_tree.setIndentation(
+                20
+            )  # Set smaller indentation to match Connection Manager
             self.collection_tree.setMinimumWidth(250)  # Set minimum width for tree
             self.collection_tree.setAlternatingRowColors(False)
             self.collection_tree.setAnimated(True)
@@ -246,14 +289,38 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         # Add left panel to main layout
         main_layout.addWidget(left_panel)
 
+        # Add spacing between left and right panels (the vertical divider)
+        main_layout.addSpacing(10)  # Add moderate spacing between panels
+
         # Create right panel for query
         right_panel = QWidget()
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
 
+        # Add a spacer at the top to match the Connections button height in the left panel
+        invisible_spacer = QWidget()
+        invisible_spacer.setFixedHeight(connections_button.sizeHint().height())
+        invisible_spacer.setVisible(True)  # Make it take up space but be invisible
+        right_layout.addWidget(invisible_spacer)
+        right_layout.addSpacing(
+            10
+        )  # Increased spacing between sections for better visual separation
+
         # Add query section label
         query_label = QLabel("Query")
+        query_label.setStyleSheet(
+            """
+            QLabel {
+                color: #ffffff;
+                font-weight: bold;
+                padding: 5px;
+                background-color: #3d3d3d;
+                border-radius: 3px;
+            }
+        """
+        )
         right_layout.addWidget(query_label)
+        right_layout.addSpacing(10)  # Add spacing after the section label
 
         # Add query tabs
         right_layout.addWidget(self.query_tabs)
@@ -261,9 +328,10 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         # Add right panel to main layout
         main_layout.addWidget(right_panel)
 
-        # Set stretch factors to maintain proportions (30% left, 70% right)
+        # Set stretch factors to maintain proportions (30% left, 0% spacing, 70% right)
         main_layout.setStretch(0, 30)  # Left panel
-        main_layout.setStretch(1, 70)  # Right panel
+        main_layout.setStretch(1, 0)  # Spacing (should not stretch)
+        main_layout.setStretch(2, 70)  # Right panel
 
         # Set dark theme style only, indicators are handled by TreeProxyStyle
         # Don't add duplicate stylesheet here, it's already set in _configure_collection_tree
@@ -302,7 +370,7 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         # These settings are critical for showing branch indicators
         self.collection_tree.setRootIsDecorated(True)  # Show decorations at root level
         self.collection_tree.setItemsExpandable(True)  # Allow items to be expanded
-        
+
         # Ensure all tree items are collapsed by default when added to the tree
         self.collection_tree.setAutoExpandDelay(-1)  # Disable auto-expand
 
