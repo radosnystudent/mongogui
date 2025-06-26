@@ -6,7 +6,6 @@ bandit>=1.7.5
 build>=1.0.3
 
 # Testing (optional but recommended)
-pytest>=7.4.3
+pytest>=8.0.0
 pytest-cov>=4.1.0
-pytest-qt>=4.2.0
-pytest-qt>=4.4.0
+pytest-qt>=4.4.0  # PyQt6 compatible version

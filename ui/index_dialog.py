@@ -99,11 +99,21 @@ class IndexDialog(QDialog):
         self.table.setRowCount(len(self.indexes))
         for row, index in enumerate(self.indexes):
             self.table.setItem(row, 0, QTableWidgetItem(index.get("name", "")))
-            fields = ", ".join(
-                f"{k}: {v}"
-                for k, v in index.get("key", {}).items()
-                if isinstance(k, str) and (v == 1 or v == -1)
-            )
+            key_data = index.get("key", [])
+            if isinstance(key_data, dict):
+                # Handle dictionary format
+                fields = ", ".join(
+                    f"{k}: {v}"
+                    for k, v in key_data.items()
+                    if isinstance(k, str) and (v == 1 or v == -1)
+                )
+            else:
+                # Handle list format
+                fields = ", ".join(
+                    f"{field}: {direction}"
+                    for field, direction in key_data
+                    if isinstance(field, str) and (direction == 1 or direction == -1)
+                )
             self.table.setItem(row, 1, QTableWidgetItem(fields))
 
     def add_index(self) -> None:
@@ -152,6 +162,7 @@ class IndexDialog(QDialog):
             )
             if reply == QMessageBox.StandardButton.Yes:
                 del self.indexes[row]
+                self.selected_index_name = None  # Reset selection after deleting
                 self.populate_table()
 
     def get_selected_index_name(self) -> str | None:
