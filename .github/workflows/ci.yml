@@ -26,6 +26,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt -r requirements-dev.txt
+          pip install pytest-qt>=4.2.0
+          # Make sure we have the correct PyQt6 versions
+          pip list | grep -E 'PyQt6|pytest-qt'
 
       - name: Format check with Black
         run: black --check .
@@ -43,7 +46,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxkbcommon-x11-0 libxcb-xinerama0 libegl1 libgl1-mesa-glx libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libgl1-mesa-dev libegl1-mesa libxkbcommon-dev libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 xvfb
+          sudo apt-get install -y libxkbcommon-x11-0 libxcb-xinerama0 libegl1 libgl1 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-randr0 libxcb-render-util0 libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0 libgl-dev libegl1 libxkbcommon-dev xvfb
 
       # Start MongoDB service for Linux (using container action)
       - name: Start MongoDB (Linux)
@@ -112,12 +115,19 @@ jobs:
         run: |
           if [ "$RUNNER_OS" = "Linux" ]; then
             export QT_QPA_PLATFORM=offscreen
+            export PYTEST_QT_API=pyqt6
             export XDG_RUNTIME_DIR=/tmp/runtime-runner
             mkdir -p $XDG_RUNTIME_DIR
+            chmod 700 $XDG_RUNTIME_DIR
             export DISPLAY=:99
-            xvfb-run -a --server-args="-screen 0 1280x800x24" pytest --cov=. --cov-report=xml
+            # Print debug information
+            python -c "from PyQt6.QtCore import QT_VERSION_STR; print(f'Qt version: {QT_VERSION_STR}')"
+            python -c "import sys; print(f'Python version: {sys.version}')"
+            # Run tests with xvfb
+            xvfb-run -a --server-args="-screen 0 1280x800x24" pytest -v --cov=. --cov-report=xml -xvs
           else
-            pytest --cov=. --cov-report=xml
+            export PYTEST_QT_API=pyqt6
+            pytest -v --cov=. --cov-report=xml
           fi
         shell: bash
 
