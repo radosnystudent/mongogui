@@ -17,6 +17,7 @@ def app() -> Generator[object]:
 
 def _setup_dialog_mocks() -> None:
     """Set up dialog-related mock functions."""
+
     def auto_accept(self: object) -> int:  # type: ignore
         return QDialog.DialogCode.Accepted  # type: ignore[return-value]
 

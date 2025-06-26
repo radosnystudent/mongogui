@@ -1,7 +1,6 @@
 import json
 from typing import Any
 
-from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -13,9 +12,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QTableWidget,
     QTableWidgetItem,
-    QTabWidget,
-    QTextEdit,
-    QVBoxLayout,
     QWidget,
 )
 
@@ -46,12 +42,14 @@ INDEX_TYPE_CHOICES = [
 class IndexDialog(QDialog):
     """Dialog for managing MongoDB indexes."""
 
-    def __init__(self, indexes: list[dict[str, Any]], parent: QWidget | None = None) -> None:
+    def __init__(
+        self, indexes: list[dict[str, Any]], parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Manage Indexes")
         self.setMinimumWidth(600)
         self.indexes = indexes
-        
+
         # Initialize table
         self.table = QTableWidget(0, 2)
         self.table.setHorizontalHeaderLabels(["Name", "Fields"])
@@ -69,23 +67,27 @@ class IndexDialog(QDialog):
 
         # Set up layout
         from typing import cast
+
         widgets = [cast(QWidget, self.table)]
-        button_widgets = [cast(QWidget, btn) for btn in [
-            self.add_btn,
-            self.edit_btn,
-            self.delete_btn,
-            self.ok_btn,
-            self.cancel_btn,
-        ]]
+        button_widgets = [
+            cast(QWidget, btn)
+            for btn in [
+                self.add_btn,
+                self.edit_btn,
+                self.delete_btn,
+                self.ok_btn,
+                self.cancel_btn,
+            ]
+        ]
         setup_dialog_layout(self, widgets, button_widgets)
-        
+
         # Connect signals
         self.add_btn.clicked.connect(self.add_index)
         self.edit_btn.clicked.connect(self.edit_index)
         self.delete_btn.clicked.connect(self.delete_index)
         self.ok_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
-        
+
         self.selected_index_name: str | None = None  # Track the selected index name
         self.populate_table()
 
@@ -129,13 +131,12 @@ class IndexDialog(QDialog):
         """Open the index editor dialog to edit the selected index."""
         if not (selected_items := self.table.selectedItems()):
             return
-            
+
         row = selected_items[0].row()
         if item := self.table.item(row, 0):
             index_name = item.text()
             index_dict = next(
-                (idx for idx in self.indexes if idx["name"] == index_name),
-                None
+                (idx for idx in self.indexes if idx["name"] == index_name), None
             )
             if index_dict:
                 result, dlg = self.show_dialog(IndexEditDialog, index_dict)
@@ -149,7 +150,7 @@ class IndexDialog(QDialog):
         """Delete the selected index after confirmation."""
         if not (selected_items := self.table.selectedItems()):
             return
-            
+
         row = selected_items[0].row()
         if item := self.table.item(row, 0):
             index_name = item.text()
@@ -175,7 +176,9 @@ class IndexDialog(QDialog):
 class IndexEditDialog(QDialog):
     """Dialog for editing a single MongoDB index."""
 
-    def __init__(self, index_dict: dict[str, Any], parent: QWidget | None = None) -> None:
+    def __init__(
+        self, index_dict: dict[str, Any], parent: QWidget | None = None
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Edit Index")
         self.setMinimumWidth(500)
@@ -186,7 +189,7 @@ class IndexEditDialog(QDialog):
         self.name_input = QLineEdit(self.index_name)
         self.unique_checkbox = QCheckBox("Unique")
         self.unique_checkbox.setChecked(index_dict.get("unique", False))
-        
+
         self.fields_table = QTableWidget(0, 2)
         self.fields_table.setHorizontalHeaderLabels(["Field", "Order"])
         self.fields_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -208,23 +211,29 @@ class IndexEditDialog(QDialog):
         field_edit_layout.addWidget(self.field_name_edit)
         field_edit_layout.addWidget(QLabel("Type:"))
         field_edit_layout.addWidget(self.index_type_combo)
-        
+
         # Set up layout
         from typing import cast
+
         widgets = [
             QLabel("Name:"),
             cast(QWidget, self.name_input),  # Use existing name_input
             cast(QWidget, self.unique_checkbox),
             QLabel("Fields:"),
             cast(QWidget, self.fields_table),
-            cast(QWidget, QWidget(self).setLayout(field_edit_layout)),  # Add field editing section
+            cast(
+                QWidget, QWidget(self).setLayout(field_edit_layout)
+            ),  # Add field editing section
         ]
-        button_widgets = [cast(QWidget, btn) for btn in [
-            self.add_field_btn,
-            self.delete_field_btn,
-            self.ok_btn,
-            self.cancel_btn,
-        ]]
+        button_widgets = [
+            cast(QWidget, btn)
+            for btn in [
+                self.add_field_btn,
+                self.delete_field_btn,
+                self.ok_btn,
+                self.cancel_btn,
+            ]
+        ]
         setup_dialog_layout(self, widgets, button_widgets)
 
         # Connect signals

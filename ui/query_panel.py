@@ -244,7 +244,9 @@ class QueryPanelMixin:
         self.data_table.setColumnCount(len(columns))
         self.data_table.setRowCount(len(results))
         self.data_table.setHorizontalHeaderLabels(columns)
-        self.data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.data_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self._table_row_docs = []
         for row, doc in enumerate(results):
             self._table_row_docs.append(doc)
@@ -461,8 +463,12 @@ class QueryPanelMixin:
         """Set up the tree view for explain results."""
         self.json_tree.clear()
         self.json_tree.show()
-        self.json_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
-        self.json_tree.header().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
+        self.json_tree.header().setSectionResizeMode(
+            0, QHeaderView.ResizeMode.Interactive
+        )
+        self.json_tree.header().setSectionResizeMode(
+            1, QHeaderView.ResizeMode.Interactive
+        )
         self.json_tree.setColumnWidth(0, 350)
         self.json_tree.setColumnWidth(1, 600)
 

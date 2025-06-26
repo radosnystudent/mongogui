@@ -35,7 +35,9 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
     def setup_collection_tree(self) -> None:
         self.collection_tree.setColumnCount(1)
         self.collection_tree.setHeaderLabels(["Database/Collection"])
-        self.collection_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.collection_tree.setContextMenuPolicy(
+            Qt.ContextMenuPolicy.CustomContextMenu
+        )
         self.collection_tree.customContextMenuRequested.connect(
             self.on_collection_tree_context_menu
         )
@@ -405,7 +407,10 @@ class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
             and hasattr(main_window, "on_collection_tree_item_clicked")
             and main_window.__class__.__name__ == "MainWindow"
         ):
-            from ui.main_window import MainWindow  # Import at function level to avoid circular import
+            from ui.main_window import (
+                MainWindow,
+            )
+
             main_window_typed = cast(MainWindow, main_window)
             main_window_typed.on_collection_tree_item_clicked(item, column)
             return None

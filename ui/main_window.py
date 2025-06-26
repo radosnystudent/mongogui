@@ -6,16 +6,14 @@ Main application window for the MongoDB GUI.
 # All UI logic is separated from business logic and database operations.
 # Use composition and the Observer pattern for state management.
 
-from typing import Any, cast
+from typing import Any
 
-from PyQt6.QtCore import Qt, QEvent, QObject
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
-    QHBoxLayout,
     QMainWindow,
     QMessageBox,
-    QPushButton,
     QTableWidget,
     QTableWidgetItem,
     QTabWidget,
@@ -25,7 +23,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from db.connection_manager import ConnectionManager
 from ui.collection_panel import CollectionPanelMixin
 from ui.connection_manager_window import ConnectionManagerWindow
 from ui.connection_widgets import ConnectionWidgetsMixin
@@ -34,7 +31,6 @@ from ui.query_panel import QueryPanelMixin
 from ui.query_tab import QueryTabWidget
 from ui.ui_utils import set_minimum_heights
 from utils.error_handling import handle_exception
-from utils.state_manager import StateManager, StateObserver
 
 NO_DB_CONNECTION_MSG = "No database connection"
 
@@ -53,12 +49,12 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         self.last_query = ""
         self.last_query_type = ""
         self.last_collection: str = ""
-        
+
         # Create central widget
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         main_layout = QVBoxLayout(central_widget)
-        
+
         # Initialize widgets
         self.data_table: QTableWidget | None = None
         self.json_tree: QTreeWidget | None = None
@@ -89,8 +85,12 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
     def setup_data_table(self) -> None:
         """Set up the data table widget."""
         self.data_table = QTableWidget()
-        self.data_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
-        self.data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.data_table.setSelectionMode(
+            QAbstractItemView.SelectionMode.SingleSelection
+        )
+        self.data_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         if self.data_table is not None:  # Help type checker
             self.data_table.setMinimumHeight(200)
             self.data_table.itemSelectionChanged.connect(self.on_row_selected)
@@ -267,7 +267,9 @@ class MainWindow(QMainWindow, ConnectionWidgetsMixin):
         self.data_table.setColumnCount(len(columns))
         self.data_table.setRowCount(len(results))
         self.data_table.setHorizontalHeaderLabels(columns)
-        self.data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        self.data_table.setSelectionBehavior(
+            QAbstractItemView.SelectionBehavior.SelectRows
+        )
         self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         self._table_row_docs = []  # Store docs for context menu

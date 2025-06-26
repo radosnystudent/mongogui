@@ -43,13 +43,13 @@ class EditDocumentDialog(QDialog):
         self.text_edit = QTextEdit(self)
         self.text_edit.setText(json.dumps(document, indent=2, default=str))
         self.highlighter = JsonHighlighter(self.text_edit.document())
-        
+
         self.validation_label = QLabel("")
         self.validation_label.setStyleSheet(
             "color: red; font-size: 15px; font-weight: bold;"
         )
         self.validation_label.setWordWrap(True)
-        
+
         self.format_btn = QPushButton("Format")
         self.save_btn = QPushButton("Save")
         self.cancel_btn = QPushButton("Cancel")

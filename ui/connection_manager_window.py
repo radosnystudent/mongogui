@@ -8,7 +8,6 @@ from PyQt6.QtGui import QAction, QGuiApplication
 from PyQt6.QtWidgets import (
     QDialog,
     QFileDialog,
-    QDialogButtonBox,
     QMessageBox,
     QPushButton,
     QToolBar,
