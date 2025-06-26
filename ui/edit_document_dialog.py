@@ -1,13 +1,13 @@
 """
 Dialog for editing a MongoDB document in JSON format.
 
-Provides a PyQt5 dialog for editing, validating, and formatting a document.
+Provides a PyQt6 dialog for editing, validating, and formatting a document.
 """
 
 import json
 
-from PyQt5.QtGui import QShowEvent
-from PyQt5.QtWidgets import (
+from PyQt6.QtGui import QShowEvent
+from PyQt6.QtWidgets import (
     QDialog,
     QLabel,
     QMessageBox,
@@ -39,17 +39,22 @@ class EditDocumentDialog(QDialog):
         self.setMinimumSize(700, 500)
         self.document = document
 
+        # Create widgets
         self.text_edit = QTextEdit(self)
         self.text_edit.setText(json.dumps(document, indent=2, default=str))
         self.highlighter = JsonHighlighter(self.text_edit.document())
+        
         self.validation_label = QLabel("")
         self.validation_label.setStyleSheet(
             "color: red; font-size: 15px; font-weight: bold;"
         )
         self.validation_label.setWordWrap(True)
+        
         self.format_btn = QPushButton("Format")
         self.save_btn = QPushButton("Save")
         self.cancel_btn = QPushButton("Cancel")
+
+        # Set up layout using helper
         widgets = [self.text_edit, self.validation_label]
         button_widgets: list[QWidget] = [
             self.format_btn,
@@ -58,34 +63,34 @@ class EditDocumentDialog(QDialog):
         ]
         setup_dialog_layout(self, widgets, button_widgets)
 
-        self.format_btn.clicked.connect(self.format_json)
+        # Connect signals
+        self.format_btn.clicked.connect(self.format_document)
         self.save_btn.clicked.connect(self.accept)
         self.cancel_btn.clicked.connect(self.reject)
-        self.text_edit.textChanged.connect(self.validate_json)
-        self.validate_json()
+        self.text_edit.textChanged.connect(self.validate_document)
+        self.validate_document()
 
-    def format_json(self) -> None:
-        """
-        Format the JSON in the text edit widget for readability.
-        Shows an error message if the JSON is invalid.
-        """
+    def format_document(self) -> None:
+        """Format the document text with proper JSON indentation."""
         try:
-            obj = json.loads(self.text_edit.toPlainText())
-            pretty = json.dumps(obj, indent=4, ensure_ascii=False)
-            self.text_edit.setPlainText(pretty)
-        except Exception as e:
-            QMessageBox.critical(self, "Invalid JSON", f"Error: {e}")
+            text = self.text_edit.toPlainText()
+            parsed = json.loads(text)
+            formatted = json.dumps(parsed, indent=2, default=str)
+            self.text_edit.setText(formatted)
+            self.validate_document()
+        except json.JSONDecodeError as e:
+            self.validation_label.setText(f"Invalid JSON: {str(e)}")
 
-    def validate_json(self) -> None:
-        """
-        Validate the JSON in the text edit widget.
-        Updates the validation label with errors if present.
-        """
+    def validate_document(self) -> bool:
+        """Validate the document text as proper JSON."""
         try:
-            json.loads(self.text_edit.toPlainText())
+            text = self.text_edit.toPlainText()
+            json.loads(text)
             self.validation_label.setText("")
-        except Exception as e:
-            self.validation_label.setText(f"Invalid JSON: {e}")
+            return True
+        except json.JSONDecodeError as e:
+            self.validation_label.setText(f"Invalid JSON: {str(e)}")
+            return False
 
     def get_edited_document(self) -> dict | None:
         """
@@ -107,15 +112,6 @@ class EditDocumentDialog(QDialog):
         )
 
     def showEvent(self, a0: QShowEvent | None) -> None:
-        """
-        Format the JSON when the dialog is shown, if possible.
-        """
-        try:
-            raw = self.text_edit.toPlainText()
-            if raw.strip():
-                obj = json.loads(raw)
-                pretty = json.dumps(obj, indent=4, ensure_ascii=False)
-                self.text_edit.setPlainText(pretty)
-        except Exception:
-            pass
+        """Handle the dialog show event."""
         super().showEvent(a0)
+        self.text_edit.setFocus()

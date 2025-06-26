@@ -4,8 +4,8 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QHeaderView,
@@ -244,7 +244,7 @@ class QueryPanelMixin:
         self.data_table.setColumnCount(len(columns))
         self.data_table.setRowCount(len(results))
         self.data_table.setHorizontalHeaderLabels(columns)
-        self.data_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self._table_row_docs = []
         for row, doc in enumerate(results):
             self._table_row_docs.append(doc)
@@ -277,7 +277,7 @@ class QueryPanelMixin:
                 if viewport
                 else self.data_table.mapToGlobal(pos)
             )
-            action = menu.exec_(global_pos)
+            action = menu.exec(global_pos)
             if action == edit_action:
                 self.edit_document(doc)
 
@@ -315,9 +315,9 @@ class QueryPanelMixin:
                 if viewport
                 else self.json_tree.mapToGlobal(pos)
             )
-            action = menu.exec_(global_pos)
+            action = menu.exec(global_pos)
             if action == edit_action:
-                doc = item.data(0, int(Qt.ItemDataRole.UserRole))
+                doc = item.data(0, Qt.ItemDataRole.UserRole)
                 if doc:
                     self.edit_document(doc)
 
@@ -325,7 +325,7 @@ class QueryPanelMixin:
         # Use self if it's a QWidget, otherwise try to get parent or pass None
         parent = self if isinstance(self, QWidget) else None
         dialog = EditDocumentDialog(document, parent)
-        if dialog.exec_() == QDialog.Accepted:
+        if dialog.exec() == QDialog.DialogCode.Accepted:
             edited_doc = dialog.get_edited_document()
             if edited_doc is not None:
                 self.update_document_in_db(edited_doc)
@@ -461,8 +461,8 @@ class QueryPanelMixin:
         """Set up the tree view for explain results."""
         self.json_tree.clear()
         self.json_tree.show()
-        self.json_tree.header().setSectionResizeMode(0, QHeaderView.Interactive)
-        self.json_tree.header().setSectionResizeMode(1, QHeaderView.Interactive)
+        self.json_tree.header().setSectionResizeMode(0, QHeaderView.ResizeMode.Interactive)
+        self.json_tree.header().setSectionResizeMode(1, QHeaderView.ResizeMode.Interactive)
         self.json_tree.setColumnWidth(0, 350)
         self.json_tree.setColumnWidth(1, 600)
 

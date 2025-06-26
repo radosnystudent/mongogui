@@ -1,8 +1,8 @@
 import os
-from typing import Any
+from typing import Any, cast
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
     QMenu,
@@ -20,7 +20,7 @@ from ui.index_dialog import IndexDialog, IndexEditDialog
 from ui.schema_editor_dialog import SchemaEditorDialog
 
 
-class CollectionPanelMixin:
+class CollectionPanelMixin(QWidget):  # Make it inherit from QWidget
     collection_layout: QVBoxLayout
     mongo_client: Any
     result_display: QTextEdit | None = None
@@ -30,13 +30,12 @@ class CollectionPanelMixin:
     def __init__(self) -> None:
         super().__init__()
         self.collection_tree = QTreeWidget()
+        self.setup_collection_tree()
 
     def setup_collection_tree(self) -> None:
         self.collection_tree.setColumnCount(1)
         self.collection_tree.setHeaderLabels(["Database/Collection"])
-        self.collection_tree.setContextMenuPolicy(
-            Qt.ContextMenuPolicy.CustomContextMenu
-        )
+        self.collection_tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.collection_tree.customContextMenuRequested.connect(
             self.on_collection_tree_context_menu
         )
@@ -48,7 +47,7 @@ class CollectionPanelMixin:
         db_item = QTreeWidgetItem([db_label])
         db_item.setData(
             0,
-            int(Qt.ItemDataRole.UserRole),
+            Qt.ItemDataRole.UserRole + 1,
             {"type": "database", "db": db_label, "mongo_client": mongo_client},
         )
         try:
@@ -58,7 +57,7 @@ class CollectionPanelMixin:
                 col_item = QTreeWidgetItem([collection_name])
                 col_item.setData(
                     0,
-                    int(Qt.ItemDataRole.UserRole),
+                    Qt.ItemDataRole.UserRole + 1,
                     {
                         "type": "collection",
                         "name": collection_name,
@@ -239,9 +238,9 @@ class CollectionPanelMixin:
         collection_name: str,
         col_item: QTreeWidgetItem | None,
     ) -> None:
-        dlg = IndexDialog(indexes, self.collection_tree)
-        result = dlg.exec_()
-        if result == QDialog.Accepted:
+        dlg = IndexDialog(indexes, self)  # Change parent to self
+        result = dlg.exec()
+        if result == QDialog.DialogCode.Accepted:
             data = dlg.get_index_data()
             if data and not self._validate_and_create_index(
                 data, mongo_client, collection_name
@@ -282,8 +281,8 @@ class CollectionPanelMixin:
         return {k: v for k, v in data.items() if k not in ("key", "name")}
 
     def show_edit_index_dialog(self, collection_name: str, index_dict: dict) -> None:
-        dlg = IndexEditDialog(index_dict, self.collection_tree)
-        if dlg.exec_() == QDialog.Accepted:
+        dlg = IndexEditDialog(index_dict, self)  # Change parent to self
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             data = dlg.get_index_data()
             if data:
                 update_result = self.mongo_client.update_index(
@@ -334,7 +333,7 @@ class CollectionPanelMixin:
     ) -> None:
         manage_action = menu.addAction("Manage indexes")
         schema_action = menu.addAction("Edit schema (JSON)")
-        action = menu.exec_(
+        action = menu.exec(
             viewport.mapToGlobal(pos)
             if viewport is not None
             else self.collection_tree.mapToGlobal(pos)
@@ -365,8 +364,8 @@ class CollectionPanelMixin:
                     self.collection_tree, "Error reading schema file", str(e)
                 )
                 return
-        dlg = SchemaEditorDialog(self.collection_tree, initial_schema)
-        if dlg.exec_() == QDialog.Accepted:
+        dlg = SchemaEditorDialog(self, initial_schema)  # Change parent to self
+        if dlg.exec() == QDialog.DialogCode.Accepted:
             try:
                 with open(schema_path, "w", encoding="utf-8") as f:
                     f.write(dlg.get_schema())
@@ -385,7 +384,7 @@ class CollectionPanelMixin:
     ) -> None:
         edit_action = menu.addAction("Edit")
         delete_action = menu.addAction("Delete")
-        action = menu.exec_(
+        action = menu.exec(
             viewport.mapToGlobal(pos)
             if viewport is not None
             else self.collection_tree.mapToGlobal(pos)
@@ -406,9 +405,11 @@ class CollectionPanelMixin:
             and hasattr(main_window, "on_collection_tree_item_clicked")
             and main_window.__class__.__name__ == "MainWindow"
         ):
-            main_window.on_collection_tree_item_clicked(item, column)
+            from ui.main_window import MainWindow  # Import at function level to avoid circular import
+            main_window_typed = cast(MainWindow, main_window)
+            main_window_typed.on_collection_tree_item_clicked(item, column)
             return None
-        data = item.data(0, int(Qt.ItemDataRole.UserRole))
+        data = item.data(0, Qt.ItemDataRole.UserRole + 1)
         if data and data.get("type") == "collection":
             collection_name = data["name"]
             parent = item.parent()

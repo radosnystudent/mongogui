@@ -1,4 +1,5 @@
-from PyQt5.QtWidgets import (
+from typing import Any
+from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QVBoxLayout,
@@ -7,7 +8,7 @@ from PyQt5.QtWidgets import (
 
 
 def set_minimum_heights(
-    window: QWidget, min_width: int = 1200, min_height: int = 800
+    window: Any, min_width: int = 1200, min_height: int = 800
 ) -> None:
     if window.width() < min_width or window.height() < min_height:
         window.resize(max(window.width(), min_width), max(window.height(), min_height))

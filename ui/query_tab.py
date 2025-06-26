@@ -2,9 +2,9 @@ import re
 from collections.abc import Callable
 from typing import Any
 
-from PyQt5.QtCore import QEvent, QObject, Qt
-from PyQt5.QtGui import QKeyEvent
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import QEvent, QObject, Qt
+from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtWidgets import (
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -376,7 +376,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         self._suggestion_popup.show()
         self._popup_shown = True
 
-    # PyQt5 expects the argument names to be a0 and a1 for eventFilter, but for clarity, we alias them internally.
     def eventFilter(self, a0: QObject | None, a1: QEvent | None) -> bool:
         """
         Filter events for the query input field to provide custom behavior.
@@ -388,21 +387,17 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         Returns:
             True if the event was handled, False otherwise.
         """
-        watched = a0
-        event = a1
-        if watched is not self.query_input:
-            return super().eventFilter(watched, event)
-        if event is None or event.type() != QEvent.Type.KeyPress:
-            return super().eventFilter(watched, event)
-        if not isinstance(event, QKeyEvent):
-            return super().eventFilter(watched, event)
+        if a0 is not self.query_input:
+            return super().eventFilter(a0, a1)
+        if not isinstance(a1, QKeyEvent) or a1.type() != QEvent.Type.KeyPress:
+            return super().eventFilter(a0, a1)
 
-        key = event.key()
+        key = a1.key()
         if key == Qt.Key.Key_F1:
             self._show_schema_suggestions()
             return True
         if not self._popup_shown:
-            return super().eventFilter(watched, event)
+            return super().eventFilter(a0, a1)
 
         if key in (Qt.Key.Key_Down, Qt.Key.Key_Up):
             self._suggestion_popup.setFocus()
@@ -419,7 +414,7 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
             if current:
                 self._insert_suggestion(current)
                 return True
-        return super().eventFilter(watched, event)
+        return super().eventFilter(a0, a1)
 
     def _insert_suggestion(self, item: QListWidgetItem | None) -> None:
         """

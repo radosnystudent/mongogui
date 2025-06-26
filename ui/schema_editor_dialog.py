@@ -1,13 +1,13 @@
 """
 Dialog for editing or creating a collection schema JSON file.
 
-Provides a PyQt5 dialog for editing, validating, and formatting collection schemas.
+Provides a PyQt6 dialog for editing, validating, and formatting collection schemas.
 """
 
 import json
 
-from PyQt5.QtGui import QShowEvent
-from PyQt5.QtWidgets import (
+from PyQt6.QtGui import QShowEvent
+from PyQt6.QtWidgets import (
     QDialog,
     QLabel,
     QMessageBox,

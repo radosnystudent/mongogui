@@ -1,6 +1,6 @@
 import sys
 
-from PyQt5.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication
 
 from ui.connection_manager_window import ConnectionManagerWindow
 from ui.main_window import MainWindow
@@ -20,4 +20,4 @@ class App:
         # Show connection manager at startup
         self.connection_manager_window.show()
         self.main_window.show()
-        sys.exit(self.qt_app.exec_())
+        sys.exit(self.qt_app.exec())

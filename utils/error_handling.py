@@ -8,7 +8,7 @@ import logging
 from collections.abc import Callable
 from typing import Any
 
-from PyQt5.QtWidgets import QMessageBox, QWidget
+from PyQt6.QtWidgets import QMessageBox, QWidget
 
 
 def handle_exception(

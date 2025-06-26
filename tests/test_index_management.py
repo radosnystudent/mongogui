@@ -4,7 +4,7 @@ from collections.abc import Generator
 from typing import cast
 
 import pytest
-from PyQt5.QtWidgets import QApplication, QDialog
+from PyQt6.QtWidgets import QApplication, QDialog
 
 from ui.index_dialog import IndexDialog, IndexEditDialog
 
@@ -18,10 +18,10 @@ def app() -> Generator[object]:
 def test_index_dialog_add_edit_remove(app: QApplication) -> None:
     # Patch exec_ for all dialogs to auto-accept
     def auto_accept(self: object) -> int:  # type: ignore
-        return QDialog.Accepted  # type: ignore[return-value]
+        return QDialog.DialogCode.Accepted  # type: ignore[return-value]
 
-    IndexDialog.exec_ = cast(object, auto_accept)  # type: ignore
-    IndexEditDialog.exec_ = cast(object, auto_accept)  # type: ignore
+    IndexDialog.exec = cast(object, auto_accept)  # type: ignore
+    IndexEditDialog.exec = cast(object, auto_accept)  # type: ignore
 
     indexes = [
         {"name": "_id_", "key": [["_id", 1]], "unique": True},

@@ -6,10 +6,10 @@ Main application window for the MongoDB GUI.
 # All UI logic is separated from business logic and database operations.
 # Use composition and the Observer pattern for state management.
 
-from typing import Any
+from typing import Any, cast
 
-from PyQt5.QtCore import Qt
-from PyQt5.QtWidgets import (
+from PyQt6.QtCore import Qt, QEvent, QObject
+from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDialog,
     QHBoxLayout,
@@ -39,28 +39,27 @@ from utils.state_manager import StateManager, StateObserver
 NO_DB_CONNECTION_MSG = "No database connection"
 
 
-class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
+class MainWindow(QMainWindow, ConnectionWidgetsMixin):
+    """Main application window for the MongoDB GUI."""
+
     def __init__(self) -> None:
+        """Initialize the main window and UI components."""
         super().__init__()
         self.setWindowTitle("MongoDB GUI")
-        self.setGeometry(100, 100, 1200, 800)
-        self.showMaximized()  # Start in fullscreen mode
+        self.setMinimumSize(800, 600)
 
-        # Instantiate ConnectionManager
-        self.conn_manager = ConnectionManager()
-        self.state_manager = StateManager()
-        self.state_manager.subscribe(self)
-        self._active_clients: dict[str, Any] = {}
-        self._mongo_client: Any = None
-
-        # Initialize components
-        self.current_connection: dict[str, Any] | None = None
-        self.current_page = 0
-        self.page_size = 50
+        # Initialize state
         self.results: list[dict[str, Any]] = []
         self.last_query = ""
         self.last_query_type = ""
-        self.last_collection: str = ""  # keep as str for mixin compatibility
+        self.last_collection: str = ""
+        
+        # Create central widget
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        
+        # Initialize widgets
         self.data_table: QTableWidget | None = None
         self.json_tree: QTreeWidget | None = None
         self.query_tabs = QTabWidget()
@@ -68,58 +67,39 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
         self.query_tabs.tabCloseRequested.connect(self._close_query_tab)
         self.query_tabs.setMovable(True)
 
-        self.connection_layout = QVBoxLayout()
+        # Set up connection section
+        self.connection_widget = QWidget()
+        main_layout.addWidget(self.connection_widget)
+        layout = QVBoxLayout()
+        self.connection_widget.setLayout(layout)
+        self.connection_layout = layout  # Store reference after setup
 
-        # Composition: instantiate helpers
+        # Add query tabs
+        main_layout.addWidget(self.query_tabs)
+
+        # Initialize panels
         self.query_panel = QueryPanelMixin()
         self.collection_panel = CollectionPanelMixin()
-
-        # Initialize ConnectionWidgetsMixin
         ConnectionWidgetsMixin.__init__(self)
 
-        # Assign ConnectionWidgetsMixin to connection_widgets
-        self.connection_widgets = self
-
-        # Ensure collection_panel attribute is always available for mixins
-        self.collection_panel = self
-
+        # Complete setup
+        self.setup_data_table()
         self.setup_ui()
-        self.load_connections()
+
+    def setup_data_table(self) -> None:
+        """Set up the data table widget."""
+        self.data_table = QTableWidget()
+        self.data_table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        if self.data_table is not None:  # Help type checker
+            self.data_table.setMinimumHeight(200)
+            self.data_table.itemSelectionChanged.connect(self.on_row_selected)
 
     def setup_ui(self) -> None:
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-
-        # Main layout
-        main_layout = QHBoxLayout(central_widget)
-
-        # Left panel for connections
-        left_panel = QWidget()
-        left_panel.setFixedWidth(300)
-        left_layout = QVBoxLayout(left_panel)
-
-        # Add 'Connections' button to open the connection manager window
-        open_conn_mgr_btn = QPushButton("Connections")
-        open_conn_mgr_btn.clicked.connect(self.open_connection_manager_window)
-        left_layout.addWidget(open_conn_mgr_btn)
-
-        # Collection tree (replaces old button list)
-        left_layout.addWidget(
-            self.collection_panel.collection_tree
-        )  # Use the mixin's tree
-        self.collection_panel.setup_collection_tree()  # Provided by CollectionPanelMixin
-
-        main_layout.addWidget(left_panel)
-
-        # Right panel
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-
-        # Add query tabs widget
-        right_layout.addWidget(self.query_tabs, stretch=1)
-
-        right_panel.setLayout(right_layout)
-        main_layout.addWidget(right_panel, stretch=1)
+        """Additional UI setup after initialization."""
+        if isinstance(self.centralWidget(), QWidget):
+            if widget := self.centralWidget():
+                set_minimum_heights(widget)
 
     def add_query_tab(
         self, collection_name: str | None = None, db_label: str | None = None
@@ -154,7 +134,7 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
             tab_title = f"{collection_name} - {active_db_label}"
 
         tab = QueryTabWidget(
-            parent=self,
+            parent=None,
             collection_name=actual_collection_name_for_tab,
             db_label=active_db_label,
             mongo_client=mongo_client,
@@ -201,7 +181,7 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
         if not coll_item:
             return
 
-        coll_data = coll_item.data(0, int(Qt.ItemDataRole.UserRole))
+        coll_data = coll_item.data(0, Qt.ItemDataRole.UserRole + 1)
         collection_name_for_index = (
             coll_data.get("name") if coll_data else "Unknown Collection"
         )
@@ -220,7 +200,7 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
     def on_collection_tree_item_clicked(
         self, item: QTreeWidgetItem, column: int
     ) -> None:
-        data = item.data(0, int(Qt.ItemDataRole.UserRole))
+        data = item.data(0, Qt.ItemDataRole.UserRole + 1)
         if not data:
             return
 
@@ -287,7 +267,7 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
         self.data_table.setColumnCount(len(columns))
         self.data_table.setRowCount(len(results))
         self.data_table.setHorizontalHeaderLabels(columns)
-        self.data_table.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.data_table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
         self.data_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
 
         self._table_row_docs = []  # Store docs for context menu
@@ -312,10 +292,10 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
             self.json_tree.addTopLevelItem(root)
 
     def edit_document(self, document: dict) -> None:
-        dialog = EditDocumentDialog(document, self)
-        if dialog.exec_() == QDialog.Accepted:
-            edited_doc = dialog.get_document()
-            self.update_document_in_db(edited_doc)
+        dialog = EditDocumentDialog(document, parent=self.centralWidget())
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            if edited_doc := dialog.get_edited_document():
+                self.update_document_in_db(edited_doc)
 
     def update_document_in_db(self, edited_doc: dict) -> None:
         if not self.mongo_client or "_id" not in edited_doc:
@@ -363,12 +343,11 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
         set_minimum_heights(self)
 
     def open_connection_manager_window(self) -> None:
-        dlg = ConnectionManagerWindow(self)
-        dlg.connection_selected.connect(self.connect_to_database)
-        dlg.exec_()
-        # Optionally: reload connections if changed
+        dlg = ConnectionManagerWindow()
+        dlg.exec()
 
-    def on_state_update(self, state: dict[str, Any]) -> None:
+    def on_state_changed(self, state: dict[str, Any]) -> None:
+        """Handle state changes as a StateObserver."""
         # Update state from StateManager
         # Example: update UI or internal state based on state dict
         pass
@@ -389,3 +368,7 @@ class MainWindow(QMainWindow, StateObserver, ConnectionWidgetsMixin):
     def connect_to_database(self, connection_name: str) -> None:
         # Explicitly call the mixin method to avoid recursion
         ConnectionWidgetsMixin.connect_to_database(self, connection_name)
+
+    def on_row_selected(self) -> None:
+        """Handle table row selection."""
+        pass  # Implement row selection handling if needed
