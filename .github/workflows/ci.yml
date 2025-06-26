@@ -28,31 +28,38 @@ jobs:
           pip install -r requirements.txt -r requirements-dev.txt
           pip install pytest-qt>=4.2.0
 
-          # Install dos2unix for line ending conversions
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            sudo apt-get install -y dos2unix
-          elif [ "$RUNNER_OS" = "macOS" ]; then
-            brew install dos2unix
-          fi
-
           # Make sure we have the correct PyQt6 versions
-          pip list | grep -E 'PyQt6|pytest-qt'
+          python -c "from pip._vendor.packaging.version import Version; import pkg_resources; print(f'PyQt6 version: {pkg_resources.get_distribution(\"PyQt6\").version}')"
+          python -c "import pkg_resources; print(f'pytest-qt version: {pkg_resources.get_distribution(\"pytest-qt\").version}')"
+        shell: bash
 
-      - name: Format check with Black
+      - name: Install dos2unix (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y dos2unix
+        shell: bash
+
+      - name: Install dos2unix (macOS)
+        if: runner.os == 'macOS'
+        run: brew install dos2unix
+        shell: bash
+
+      - name: Set git line endings
+        run: git config --global core.autocrlf input
+        shell: bash
+
+      - name: Normalize line endings (Unix)
+        if: runner.os == 'Linux' || runner.os == 'macOS'
+        run: find . -name "*.py" -type f -exec dos2unix {} \;
+        shell: bash
+
+      - name: Format with Black
         run: |
-          # Set line ending style to LF for GitHub Actions
-          git config --global core.autocrlf input
-
-          # Normalize line endings for Python files
-          if [ "$RUNNER_OS" = "Linux" ] || [ "$RUNNER_OS" = "macOS" ]; then
-            find . -name "*.py" -type f -exec dos2unix {} \;
-          fi
-
           # Apply black formatting to problematic file first
           black tests/conftest.py
 
           # Then check all files
           black --check --target-version=py310 --line-length=88 .
+        shell: bash
 
       - name: Lint with Ruff
         run: ruff check .
@@ -132,25 +139,44 @@ jobs:
           if ($waited -eq $maxWait) { Write-Error 'MongoDB did not start in time.'; exit 1 }
         shell: pwsh
 
-      - name: Test with pytest
+      - name: Test with pytest (Linux)
+        if: runner.os == 'Linux'
         run: |
-          if [ "$RUNNER_OS" = "Linux" ]; then
-            export QT_QPA_PLATFORM=offscreen
-            export PYTEST_QT_API=pyqt6
-            export XDG_RUNTIME_DIR=/tmp/runtime-runner
-            mkdir -p $XDG_RUNTIME_DIR
-            chmod 700 $XDG_RUNTIME_DIR
-            export DISPLAY=:99
-            # Print debug information
-            python -c "from PyQt6.QtCore import QT_VERSION_STR; print(f'Qt version: {QT_VERSION_STR}')"
-            python -c "import sys; print(f'Python version: {sys.version}')"
-            # Run tests with xvfb
-            xvfb-run -a --server-args="-screen 0 1280x800x24" pytest -v --cov=. --cov-report=xml -xvs
-          else
-            export PYTEST_QT_API=pyqt6
-            pytest -v --cov=. --cov-report=xml
-          fi
+          export QT_QPA_PLATFORM=offscreen
+          export PYTEST_QT_API=pyqt6
+          export XDG_RUNTIME_DIR=/tmp/runtime-runner
+          mkdir -p $XDG_RUNTIME_DIR
+          chmod 700 $XDG_RUNTIME_DIR
+          export DISPLAY=:99
+
+          # Print debug information
+          python -c "from PyQt6.QtCore import QT_VERSION_STR; print(f'Qt version: {QT_VERSION_STR}')"
+          python -c "import sys; print(f'Python version: {sys.version}')"
+
+          # Run tests with xvfb
+          xvfb-run -a --server-args="-screen 0 1280x800x24" pytest -v --cov=. --cov-report=xml -xvs
         shell: bash
+
+      - name: Test with pytest (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          export PYTEST_QT_API=pyqt6
+          python -c "from PyQt6.QtCore import QT_VERSION_STR; print(f'Qt version: {QT_VERSION_STR}')"
+          pytest -v --cov=. --cov-report=xml
+        shell: bash
+
+      - name: Test with pytest (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $env:PYTEST_QT_API = "pyqt6"
+
+          # Print debug information
+          python -c "from PyQt6.QtCore import QT_VERSION_STR; print('Qt version: ' + QT_VERSION_STR)"
+          python -c "import sys; print('Python version: ' + sys.version)"
+
+          # Run tests
+          pytest -v --cov=. --cov-report=xml
+        shell: pwsh
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v5
