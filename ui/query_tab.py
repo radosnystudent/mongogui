@@ -1,3 +1,4 @@
+import json
 import re
 from collections.abc import Callable
 from typing import Any
@@ -510,7 +511,14 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
 
     def open_query_builder(self) -> None:
         """Open the query builder dialog for visual query building."""
-        # Load schema fields for the current collection
+        schema_fields = self._get_schema_fields_for_query_builder()
+        dialog = QueryBuilderDialog(schema_fields, self)
+
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._process_query_builder_result(dialog)
+
+    def _get_schema_fields_for_query_builder(self) -> list[str]:
+        """Get schema fields for the query builder dialog."""
         if self.db_label and self.collection_name:
             schema_fields = self._load_schema_for_collection(
                 self.db_label, self.collection_name
@@ -518,21 +526,47 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         else:
             schema_fields = []
 
-        # Make sure we have at least some fields
+        # Ensure we have at least the _id field
         if not schema_fields:
-            schema_fields = ["_id"]  # Ensure we have at least the _id field
+            schema_fields = ["_id"]
 
-        # Create and show the query builder dialog
-        dialog = QueryBuilderDialog(schema_fields, self)
-        if dialog.exec() == QDialog.DialogCode.Accepted:
-            # Get the built query and insert it into the query input
-            built_query = dialog.get_built_query()
-            if built_query:
-                # Create a complete MongoDB query
-                if self.collection_name:
-                    full_query = f"db.{self.collection_name}.find({built_query})"
-                else:
-                    full_query = f"db.collection.find({built_query})"
+        return schema_fields
 
-                # Set the query in the input
-                self.query_input.setText(full_query)
+    def _process_query_builder_result(self, dialog: QueryBuilderDialog) -> None:
+        """Process the result from the query builder dialog."""
+        built_filter = dialog.get_built_query()
+        if not built_filter:
+            return
+
+        options = dialog.get_query_options()
+        full_query = self._build_mongodb_query_string(built_filter, options)
+        self.query_input.setText(full_query)
+
+    def _build_mongodb_query_string(
+        self, filter_query: str, options: dict[str, Any]
+    ) -> str:
+        """Build a complete MongoDB query string with filter and options."""
+        query_parts = []
+
+        # Start with the base find query
+        collection_name = self.collection_name or "collection"
+        query_parts.append(f"db.{collection_name}.find({filter_query})")
+
+        # Add query options
+        self._add_query_options_to_parts(query_parts, options)
+
+        return "".join(query_parts)
+
+    def _add_query_options_to_parts(
+        self, query_parts: list[str], options: dict[str, Any]
+    ) -> None:
+        """Add sort, limit, and skip options to the query parts list."""
+        if "sort" in options:
+            sort_str = json.dumps(options["sort"])
+            query_parts.append(f".sort({sort_str})")
+
+        if "limit" in options:
+            query_parts.append(f".limit({options['limit']})")
+
+        if "skip" in options:
+            query_parts.append(f".skip({options['skip']})")
