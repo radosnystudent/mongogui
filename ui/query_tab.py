@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from ui.query_builder_dialog import QueryBuilderDialog
+from ui.enhanced_query_builder_dialog import EnhancedQueryBuilderDialog
 from ui.query_panel import QueryPanelMixin
 from ui.ui_utils import set_minimum_heights
 from utils.error_handling import handle_exception
@@ -512,7 +512,7 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
     def open_query_builder(self) -> None:
         """Open the query builder dialog for visual query building."""
         schema_fields = self._get_schema_fields_for_query_builder()
-        dialog = QueryBuilderDialog(schema_fields, self)
+        dialog = EnhancedQueryBuilderDialog(schema_fields, self)
 
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._process_query_builder_result(dialog)
@@ -532,15 +532,29 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
 
         return schema_fields
 
-    def _process_query_builder_result(self, dialog: QueryBuilderDialog) -> None:
+    def _process_query_builder_result(self, dialog: EnhancedQueryBuilderDialog) -> None:
         """Process the result from the query builder dialog."""
         built_filter = dialog.get_built_query()
         if not built_filter:
             return
 
-        options = dialog.get_query_options()
-        full_query = self._build_mongodb_query_string(built_filter, options)
+        query_type = dialog.get_query_type()
+
+        if query_type == "find":
+            options = dialog.get_query_options()
+            full_query = self._build_mongodb_query_string(built_filter, options)
+        elif query_type == "aggregate":
+            # For aggregation queries, build a db.collection.aggregate() call
+            full_query = self._build_mongodb_aggregate_string(built_filter)
+        else:
+            full_query = built_filter
+
         self.query_input.setText(full_query)
+
+    def _build_mongodb_aggregate_string(self, pipeline_json: str) -> str:
+        """Build a complete MongoDB aggregation query string."""
+        collection_name = self.collection_name or "collection"
+        return f"db.{collection_name}.aggregate({pipeline_json})"
 
     def _build_mongodb_query_string(
         self, filter_query: str, options: dict[str, Any]
