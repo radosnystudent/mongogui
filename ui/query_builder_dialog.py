@@ -85,6 +85,9 @@ class ConditionWidget(QWidget):
                 border-color: #4a9eff;
                 background-color: #3a3a3a;
             }
+            QComboBox:editable {
+                background-color: #333333;
+            }
             QComboBox::drop-down {
                 border: none;
                 width: 20px;
@@ -110,12 +113,18 @@ class ConditionWidget(QWidget):
         field_layout.setContentsMargins(0, 0, 0, 0)
         field_layout.setSpacing(4)
 
-        field_label = QLabel("Field")
+        field_label = QLabel("Field (type or select)")
         field_layout.addWidget(field_label)
 
         self.field_combo = QComboBox()
+        self.field_combo.setEditable(True)  # Allow typing custom field names
         self.field_combo.addItems(self.fields)
         self.field_combo.setMinimumWidth(150)
+        self.field_combo.setToolTip("Select a field or type a custom field name")
+        # Set placeholder text for the editable field
+        line_edit = self.field_combo.lineEdit()
+        if line_edit:
+            line_edit.setPlaceholderText("Type field name...")
         field_layout.addWidget(self.field_combo)
         layout.addWidget(field_container, stretch=2)
 
@@ -159,25 +168,27 @@ class ConditionWidget(QWidget):
         remove_label = QLabel("")
         remove_layout.addWidget(remove_label)
 
-        remove_btn = QPushButton("×")
-        remove_btn.setFixedWidth(35)
-        remove_btn.setFixedHeight(35)
-        remove_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        remove_btn = QPushButton("Remove")
+        remove_btn.setFixedWidth(70)
+        remove_btn.setToolTip("Remove this condition")
+        remove_btn.clicked.connect(self.removed.emit)
         remove_btn.setStyleSheet(
             """
             QPushButton {
-                background-color: #d32f2f;
-                color: white;
+                background-color: #505050;
+                color: #ddd;
                 font-weight: bold;
-                font-size: 18px;
-                border: none;
-                border-radius: 17px;
+                font-size: 11px;
+                border: 1px solid #555;
+                border-radius: 3px;
+                padding: 4px 6px;
             }
             QPushButton:hover {
-                background-color: #c62828;
+                background-color: #6a4c4c;
+                border-color: #666;
             }
             QPushButton:pressed {
-                background-color: #b71c1c;
+                background-color: #5a3c3c;
             }
         """
         )
@@ -187,9 +198,14 @@ class ConditionWidget(QWidget):
 
     def get_condition(self) -> dict[str, Any]:
         """Get the condition as a MongoDB query dict."""
-        field = self.field_combo.currentText()
+        # Get field name from either selected item or typed text
+        field = self.field_combo.currentText().strip()
         operator = self.operator_combo.currentText()
         value_text = self.value_input.text().strip()
+
+        # Validate field name
+        if not field:
+            return {}
 
         if not value_text:
             return {}
@@ -247,16 +263,17 @@ class LogicalOperatorWidget(QWidget):
         self.operator_combo.setStyleSheet(
             """
             QComboBox {
-                background-color: #4a9eff;
-                color: white;
-                border: none;
+                background-color: #404040;
+                color: #ddd;
+                border: 1px solid #555;
                 border-radius: 4px;
                 padding: 6px;
                 font-weight: bold;
                 font-size: 12px;
             }
             QComboBox:hover {
-                background-color: #357abd;
+                background-color: #505050;
+                border-color: #666;
             }
             QComboBox::drop-down {
                 border: none;
@@ -266,7 +283,7 @@ class LogicalOperatorWidget(QWidget):
                 image: none;
                 border-left: 4px solid transparent;
                 border-right: 4px solid transparent;
-                border-top: 4px solid white;
+                border-top: 4px solid #ddd;
                 margin-right: 5px;
             }
         """
@@ -312,7 +329,7 @@ class QueryBuilderDialog(QDialog):
         title_font.setBold(True)
         title_label.setFont(title_font)
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title_label.setStyleSheet("color: #333; margin-bottom: 10px;")
+        title_label.setStyleSheet("color: #ddd; margin-bottom: 10px;")
         main_layout.addWidget(title_label)
 
         # Description
@@ -320,30 +337,30 @@ class QueryBuilderDialog(QDialog):
             "Create conditions to build your MongoDB query. Click 'Add Condition' to add more criteria."
         )
         desc_label.setWordWrap(True)
-        desc_label.setStyleSheet("color: #666; font-size: 12px; margin-bottom: 10px;")
+        desc_label.setStyleSheet("color: #aaa; font-size: 12px; margin-bottom: 10px;")
         main_layout.addWidget(desc_label)
 
         # Add Condition button
         self.add_btn = QPushButton("+ Add Condition")
-        self.add_btn.setMinimumHeight(40)
-        self.add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.add_btn.setToolTip("Add a new condition to the query")
         self.add_btn.clicked.connect(self.add_condition)
         self.add_btn.setStyleSheet(
             """
             QPushButton {
-                background-color: #4a9eff;
-                color: white;
+                background-color: #404040;
+                color: #ddd;
                 font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 14px;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #357abd;
+                background-color: #505050;
+                border-color: #666;
             }
             QPushButton:pressed {
-                background-color: #2565a3;
+                background-color: #353535;
             }
         """
         )
@@ -358,8 +375,8 @@ class QueryBuilderDialog(QDialog):
         scroll.setStyleSheet(
             """
             QScrollArea {
-                background-color: #f5f5f5;
-                border: 2px solid #ddd;
+                background-color: #2e2e2e;
+                border: 2px solid #555;
                 border-radius: 8px;
             }
         """
@@ -381,25 +398,25 @@ class QueryBuilderDialog(QDialog):
 
         # Clear All button
         clear_btn = QPushButton("Clear All")
-        clear_btn.setMinimumHeight(40)
-        clear_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        clear_btn.setToolTip("Remove all conditions")
         clear_btn.clicked.connect(self.clear_all)
         clear_btn.setStyleSheet(
             """
             QPushButton {
-                background-color: #f44336;
-                color: white;
+                background-color: #505050;
+                color: #ddd;
                 font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 14px;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #d32f2f;
+                background-color: #606060;
+                border-color: #666;
             }
             QPushButton:pressed {
-                background-color: #c62828;
+                background-color: #404040;
             }
         """
         )
@@ -409,25 +426,25 @@ class QueryBuilderDialog(QDialog):
 
         # Cancel button
         cancel_btn = QPushButton("Cancel")
-        cancel_btn.setMinimumHeight(40)
-        cancel_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        cancel_btn.setToolTip("Cancel and close dialog")
         cancel_btn.clicked.connect(self.reject)
         cancel_btn.setStyleSheet(
             """
             QPushButton {
-                background-color: #757575;
-                color: white;
+                background-color: #505050;
+                color: #ddd;
                 font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 14px;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #616161;
+                background-color: #606060;
+                border-color: #666;
             }
             QPushButton:pressed {
-                background-color: #424242;
+                background-color: #404040;
             }
         """
         )
@@ -435,25 +452,25 @@ class QueryBuilderDialog(QDialog):
 
         # Build Query button
         self.build_btn = QPushButton("Build Query")
-        self.build_btn.setMinimumHeight(40)
-        self.build_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.build_btn.setToolTip("Build the query and insert into main window")
         self.build_btn.clicked.connect(self.build_and_accept)
         self.build_btn.setStyleSheet(
             """
             QPushButton {
-                background-color: #28a745;
-                color: white;
+                background-color: #4a6741;
+                color: #ddd;
                 font-weight: bold;
-                border: none;
-                border-radius: 6px;
-                padding: 10px 20px;
-                font-size: 14px;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 6px 12px;
+                font-size: 12px;
             }
             QPushButton:hover {
-                background-color: #218838;
+                background-color: #5a7751;
+                border-color: #666;
             }
             QPushButton:pressed {
-                background-color: #1e7e34;
+                background-color: #3a5731;
             }
         """
         )
@@ -465,7 +482,8 @@ class QueryBuilderDialog(QDialog):
         self.setStyleSheet(
             """
             QDialog {
-                background-color: white;
+                background-color: #3a3a3a;
+                color: #ddd;
             }
         """
         )

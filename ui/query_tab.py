@@ -92,25 +92,6 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         query_builder_btn = QPushButton("🔧 Query Builder")
         query_builder_btn.setToolTip("Open visual query builder")
         query_builder_btn.clicked.connect(self.open_query_builder)
-        query_builder_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4a9eff;
-                color: white;
-                font-weight: bold;
-                border: none;
-                border-radius: 4px;
-                padding: 8px 12px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #357abd;
-            }
-            QPushButton:pressed {
-                background-color: #2565a3;
-            }
-        """
-        )
         query_controls.addWidget(query_builder_btn)
 
         execute_btn = QPushButton("Execute")
