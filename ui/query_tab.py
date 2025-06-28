@@ -6,6 +6,7 @@ from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtWidgets import (
     QComboBox,
+    QDialog,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -14,12 +15,14 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QTableWidget,
+    QTabWidget,
     QTextEdit,
     QTreeWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from ui.query_builder_dialog import QueryBuilderDialog
 from ui.query_panel import QueryPanelMixin
 from ui.ui_utils import set_minimum_heights
 from utils.error_handling import handle_exception
@@ -67,6 +70,7 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         Set up the UI layout and widgets for the query tab.
         """
         layout = QVBoxLayout(self)
+
         # Query input
         query_label = QLabel("Query:")
         layout.addWidget(query_label)
@@ -80,8 +84,35 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         if self.collection_name:
             self.query_input.setText(f"db.{self.collection_name}.find({{}})")
         layout.addWidget(self.query_input)
+
         # Query controls
         query_controls = QHBoxLayout()
+
+        # Query Builder button
+        query_builder_btn = QPushButton("🔧 Query Builder")
+        query_builder_btn.setToolTip("Open visual query builder")
+        query_builder_btn.clicked.connect(self.open_query_builder)
+        query_builder_btn.setStyleSheet(
+            """
+            QPushButton {
+                background-color: #4a9eff;
+                color: white;
+                font-weight: bold;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 12px;
+                font-size: 12px;
+            }
+            QPushButton:hover {
+                background-color: #357abd;
+            }
+            QPushButton:pressed {
+                background-color: #2565a3;
+            }
+        """
+        )
+        query_controls.addWidget(query_builder_btn)
+
         execute_btn = QPushButton("Execute")
         execute_btn.clicked.connect(self.execute_query)
         query_controls.addWidget(execute_btn)
@@ -192,21 +223,75 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         """
         self.mongo_client = mongo_client
 
-    def set_collection(self, collection_name: str, db_label: str) -> None:
-        """
-        Set the MongoDB collection and update the placeholder text for the query input.
+    def _load_schema_for_collection(
+        self, db_label: str, collection_name: str
+    ) -> list[str]:
+        """Load schema fields from a file or infer from collection."""
+        import json
+        import os
 
-        Args:
-            collection_name: Name of the MongoDB collection.
-            db_label: Label for the database.
-        """
+        schema_fields = []
+        schema_path = os.path.join("schemas", f"{db_label}__{collection_name}.json")
+
+        # Try to load from file
+        try:
+            if os.path.exists(schema_path):
+                with open(schema_path) as f:
+                    schema = json.load(f)
+                    schema_fields = list(
+                        schema.keys()
+                    )  # Just get top-level field names
+        except Exception as e:
+            handle_exception(e)
+
+        # Try to infer from collection if needed
+        if not schema_fields and self.mongo_client:
+            schema_fields = self._infer_schema_from_collection(collection_name)
+
+        # Add _id field if not already present
+        if "_id" not in schema_fields:
+            schema_fields.insert(0, "_id")
+
+        return schema_fields
+
+    def _infer_schema_from_collection(self, collection_name: str) -> list[str]:
+        """Infer schema fields from a sample document in the collection."""
+        schema_fields = []
+        try:
+            # Get a sample document to infer fields
+            result = self.mongo_client.execute_query(
+                f"db.{collection_name}.findOne({{}})", page=0, page_size=1
+            )
+            if result.is_ok and result.unwrap():
+                # Extract field names from the document
+                sample_doc = (
+                    result.unwrap()[0]
+                    if isinstance(result.unwrap(), list)
+                    else result.unwrap()
+                )
+                schema_fields = list(sample_doc.keys())  # Get field names from sample
+        except Exception:
+            pass
+        return schema_fields
+
+    def set_collection(self, collection_name: str, db_label: str) -> None:
+        """Set the current collection and update the query builder."""
         self.collection_name = collection_name
-        self.last_collection = collection_name
         self.db_label = db_label
+        self.last_collection = collection_name
         self.last_db_label = db_label
-        self.query_input.setPlaceholderText(
-            f"Enter MongoDB query (e.g., db.{collection_name}.find({{}}))"
-        )
+
+        # Update window title
+        parent = self.parent()
+        if parent and isinstance(parent, QTabWidget):
+            parent.setTabText(parent.indexOf(self), collection_name)
+
+        # Update query input with new collection name
+        if hasattr(self, "query_input"):
+            self.query_input.setPlainText(f"db.{collection_name}.find({{}})")
+            self.query_input.setPlaceholderText(
+                f"Enter MongoDB query (e.g., db.{collection_name}.find({{}}))"
+            )
 
     def execute_query(self) -> None:
         """
@@ -236,9 +321,13 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
             else:
                 self._set_db_info_label(f"Error: {result.unwrap_err()}")
         except Exception as e:
-            handle_exception(
-                e, parent=getattr(self, "parent", None), title="Query Error"
-            )
+            from PyQt6.QtWidgets import QWidget
+
+            parent_widget = self.parent()
+            if isinstance(parent_widget, QWidget):
+                handle_exception(e, parent=parent_widget, title="Query Error")
+            else:
+                handle_exception(e, parent=None, title="Query Error")
             self._set_db_info_label(f"Query error: {str(e)}")
 
     def next_page(self) -> None:
@@ -437,3 +526,32 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         """Hide the suggestion popup."""
         self._suggestion_popup.hide()
         self._popup_shown = False
+
+    def open_query_builder(self) -> None:
+        """Open the query builder dialog for visual query building."""
+        # Load schema fields for the current collection
+        if self.db_label and self.collection_name:
+            schema_fields = self._load_schema_for_collection(
+                self.db_label, self.collection_name
+            )
+        else:
+            schema_fields = []
+
+        # Make sure we have at least some fields
+        if not schema_fields:
+            schema_fields = ["_id"]  # Ensure we have at least the _id field
+
+        # Create and show the query builder dialog
+        dialog = QueryBuilderDialog(schema_fields, self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            # Get the built query and insert it into the query input
+            built_query = dialog.get_built_query()
+            if built_query:
+                # Create a complete MongoDB query
+                if self.collection_name:
+                    full_query = f"db.{self.collection_name}.find({built_query})"
+                else:
+                    full_query = f"db.collection.find({built_query})"
+
+                # Set the query in the input
+                self.query_input.setText(full_query)
