@@ -53,12 +53,7 @@ jobs:
         shell: bash
 
       - name: Format with Black
-        run: |
-          # Apply black formatting to problematic file first
-          black tests/conftest.py
-
-          # Then check all files
-          black --check --target-version=py310 --line-length=88 .
+        run: black --check --target-version=py313 --line-length=88 .
         shell: bash
 
       - name: Lint with Ruff
