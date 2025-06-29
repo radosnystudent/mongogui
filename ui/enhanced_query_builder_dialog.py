@@ -472,6 +472,17 @@ class EnhancedQueryBuilderDialog(QDialog):
         # Create a new root group
         self._create_find_root_group()
 
+        # Clear any initial conditions that may have been automatically created
+        if self.find_root_group and hasattr(self.find_root_group, "conditions"):
+            # Remove all existing conditions from the root group
+            for condition in self.find_root_group.conditions[
+                :
+            ]:  # Make a copy to iterate safely
+                if hasattr(condition, "setParent"):
+                    condition.setParent(None)
+                    condition.deleteLater()
+            self.find_root_group.conditions.clear()
+
         # Clear sort/limit/skip fields
         self.sort_field_combo.setCurrentText("")
         self.limit_input.clear()
@@ -968,21 +979,19 @@ class EnhancedQueryBuilderDialog(QDialog):
             return
 
         try:
-            # If this is the first filter and root group is empty, use it
-            if not self.find_root_group.conditions:
-                self._populate_condition_from_data(self.find_root_group, filter_data)
-            else:
-                # Add a new condition to the root group
-                self.find_root_group.add_condition()
-                if self.find_root_group.conditions:
-                    last_condition = self.find_root_group.conditions[-1]
-                    # Check if it's a ConditionWidget (not a ConditionGroup)
-                    from ui.query_builder_dialog import ConditionWidget
+            # Always add a new condition since we start with a clean root group when loading templates
+            self.find_root_group.add_condition()
+            if self.find_root_group.conditions:
+                last_condition = self.find_root_group.conditions[-1]
+                # Check if it's a ConditionWidget (not a ConditionGroup)
+                from ui.query_builder_dialog import ConditionWidget
 
-                    if isinstance(last_condition, ConditionWidget):
-                        self._set_condition_components(last_condition, filter_data)
+                if isinstance(last_condition, ConditionWidget):
+                    self._set_condition_components(last_condition, filter_data)
         except Exception as e:
             # If we can't properly reconstruct the filter, just skip it
+            # This ensures the template loading doesn't completely fail
+            print(f"Warning: Could not load filter data: {e}")
             # This ensures the template loading doesn't completely fail
             print(f"Warning: Could not load filter data: {e}")
 
