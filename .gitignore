@@ -175,6 +175,8 @@ cython_debug/
 
 connections/
 schemas/
+docs/
+templates/
 
 copilot-instructions.md
 

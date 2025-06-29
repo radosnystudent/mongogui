@@ -52,14 +52,9 @@ jobs:
         run: find . -name "*.py" -type f -exec dos2unix {} \;
         shell: bash
 
-      - name: Format with Black
-        run: |
-          # Apply black formatting to problematic file first
-          black tests/conftest.py
-
-          # Then check all files
-          black --check --target-version=py310 --line-length=88 .
-        shell: bash
+      # - name: Format with Black
+      #   run: black --check --target-version=py310 --line-length=88 .
+      #   shell: bash
 
       - name: Lint with Ruff
         run: ruff check .

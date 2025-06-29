@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 
 from ui.constants import EDIT_DOCUMENT_ACTION, EDIT_DOCUMENT_TITLE, SCHEMA_DIR
 from ui.edit_document_dialog import EditDocumentDialog
+from ui.query_builder import QueryBuilder
 from utils.error_handling import handle_exception
 
 
@@ -75,6 +76,10 @@ class QueryPanelMixin:
     view_as_picker: Any = None  #: Optional widget for result view mode selection
     nav_controls_widget: QWidget | None = None  #: Optional container for nav controls
     view_switch_widget: QWidget | None = None  #: Optional container for view switcher
+    query_builder: QueryBuilder | None = None  #: Optional query builder widget
+    query_builder_placeholder: QWidget | None = (
+        None  #: Optional placeholder for query builder
+    )
 
     def execute_query(self) -> None:
         """
@@ -805,3 +810,70 @@ class QueryPanelMixin:
             return []
         path = m.group(1).split(".")
         return self.get_collection_schema_fields(db, collection, path)
+
+    def setup_query_builder(self, fields: list[str]) -> None:
+        """Set up the query builder with a list of field names."""
+        # Safety checks
+        if not hasattr(self, "query_builder_placeholder") or not isinstance(
+            self, QWidget
+        ):
+            return
+
+        placeholder = self.query_builder_placeholder
+        if not placeholder:
+            return
+
+        parent = placeholder.parentWidget()
+        if not parent:
+            return
+
+        layout = parent.layout()
+        if not isinstance(layout, QVBoxLayout):
+            return
+
+        # Create the QueryBuilder
+        self.query_builder = QueryBuilder(fields)
+
+        # Connect signal
+        self.query_builder.query_built.connect(self._on_query_built)
+
+        # Get placeholder index
+        index = layout.indexOf(placeholder)
+        if index < 0:
+            return
+
+        # Remove placeholder
+        layout.removeWidget(placeholder)
+        placeholder.deleteLater()
+
+        # Add the query builder to the layout
+        layout.insertWidget(index, self.query_builder)
+        self.query_builder_placeholder = None
+
+        # Set up styling and visibility
+        self.query_builder.setMinimumHeight(200)
+        self.query_builder.setMinimumWidth(400)
+        self.query_builder.show()
+        self.query_builder.setVisible(True)
+
+        # Force updates
+        self.query_builder.updateGeometry()
+        self.query_builder.update()
+        self.query_builder.show()
+        self.query_builder.setVisible(True)
+
+        # Process events to ensure proper initialization
+        from PyQt6.QtWidgets import QApplication
+
+        app_instance = QApplication.instance()
+        if app_instance:
+            app_instance.processEvents()
+
+        layout.update()
+        parent.updateGeometry()
+        parent.update()
+
+    def _on_query_built(self, query_str: str) -> None:
+        """Handle the query built by the QueryBuilder."""
+        if hasattr(self, "query_input") and self.query_input:
+            self.query_input.setText(query_str)
