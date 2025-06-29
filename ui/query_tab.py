@@ -91,8 +91,15 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
 
         # Query Builder button
         query_builder_btn = QPushButton("🔧 Query Builder")
-        query_builder_btn.setToolTip("Open visual query builder")
+        query_builder_btn.setToolTip("Open visual query builder (Ctrl+B)")
         query_builder_btn.clicked.connect(self.open_query_builder)
+
+        # Add keyboard shortcut for query builder
+        from PyQt6.QtGui import QKeySequence, QShortcut
+
+        builder_shortcut = QShortcut(QKeySequence("Ctrl+B"), self)
+        builder_shortcut.activated.connect(self.open_query_builder)
+
         query_controls.addWidget(query_builder_btn)
 
         execute_btn = QPushButton("Execute")
