@@ -993,7 +993,6 @@ class EnhancedQueryBuilderDialog(QDialog):
             # This ensures the template loading doesn't completely fail
             print(f"Warning: Could not load filter data: {e}")
             # This ensures the template loading doesn't completely fail
-            print(f"Warning: Could not load filter data: {e}")
 
     def _populate_condition_from_data(
         self, group: Any, filter_data: dict[str, Any]

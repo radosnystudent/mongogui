@@ -556,7 +556,7 @@ class QueryTabWidget(QWidget, QueryPanelMixin):
         else:
             full_query = built_filter
 
-        self.query_input.setText(full_query)
+        self.query_input.setPlainText(full_query)
 
     def _build_mongodb_aggregate_string(self, pipeline_json: str) -> str:
         """Build a complete MongoDB aggregation query string."""
