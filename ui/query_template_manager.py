@@ -75,8 +75,10 @@ class QueryTemplateManager(QObject):
 
     def _get_default_storage_dir(self) -> str:
         """Get default storage directory for templates."""
-        home_dir = Path.home()
-        return str(home_dir / ".mongogui" / "templates")
+        # Get the project root directory (where this file's parent directories are)
+        current_file = Path(__file__)
+        project_root = current_file.parent.parent  # Go up from ui/ to project root
+        return str(project_root / "templates")
 
     def _load_templates(self) -> None:
         """Load templates from storage."""

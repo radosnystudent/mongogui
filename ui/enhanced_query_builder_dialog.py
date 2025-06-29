@@ -651,25 +651,42 @@ class EnhancedQueryBuilderDialog(QDialog):
         """Save the current query as a template."""
         from PyQt6.QtWidgets import QInputDialog, QMessageBox
 
-        # Get current query data
-        if self.query_type == "find":
-            query_data = {
-                "type": "find",
-                "filters": self._get_filter_data(),
-                "options": self.get_query_options(),
-            }
-        else:
-            query_data = {
-                "type": "aggregate",
-                "pipeline": self.pipeline_builder.get_pipeline(),
-            }
+        # Get current query data by building it on-demand
+        try:
+            if self.query_type == "find":
+                # Build the query data from current filter state
+                query_data = {
+                    "type": "find",
+                    "filters": self._extract_current_filter_data(),
+                    "options": self.get_query_options(),
+                }
+                # Check if we have meaningful data
+                has_data = bool(query_data.get("filters")) or bool(
+                    query_data.get("options")
+                )
+            else:
+                # For aggregation, get the pipeline
+                pipeline = self.pipeline_builder.get_pipeline()
+                query_data = {
+                    "type": "aggregate",
+                    "pipeline": pipeline,
+                }
+                has_data = bool(pipeline)
 
-        # If no data, show message
-        if not query_data.get("filters") and not query_data.get("pipeline"):
-            QMessageBox.information(
+            # If no meaningful data, show message
+            if not has_data:
+                QMessageBox.information(
+                    self,
+                    "No Query Data",
+                    "Please add some conditions or pipeline stages before saving as a template.",
+                )
+                return
+
+        except Exception as e:
+            QMessageBox.warning(
                 self,
-                "No Query Data",
-                "Please build a query before saving it as a template.",
+                self.SAVE_ERROR_TITLE,
+                f"Error extracting query data: {str(e)}",
             )
             return
 
@@ -798,9 +815,62 @@ class EnhancedQueryBuilderDialog(QDialog):
 
     def _get_filter_data(self) -> list[dict[str, Any]]:
         """Get current filter data from the find query builder."""
-        # For now, return empty list since we need complex integration with the filter builder
-        # This can be enhanced later to extract actual filter data
-        return []
+        return self._extract_current_filter_data()
+
+    def _extract_current_filter_data(self) -> list[dict[str, Any]]:
+        """Extract current filter data from the find query builder UI components."""
+        if not self.find_root_group:
+            return []
+
+        try:
+            # Extract UI-format data instead of MongoDB format for better template restoration
+            filter_data = []
+
+            # Get data from root group
+            root_data = self._extract_group_ui_data(self.find_root_group)
+            if root_data:
+                filter_data.extend(root_data)
+
+            # Get data from additional groups
+            for i in range(self.find_groups_layout.count()):
+                item = self.find_groups_layout.itemAt(i)
+                if not item:
+                    continue
+
+                widget = item.widget()
+                if self._is_valid_additional_group(widget):
+                    group_data = self._extract_group_ui_data(widget)
+                    if group_data:
+                        filter_data.extend(group_data)
+
+            return filter_data
+        except Exception as e:
+            print(f"Warning: Could not extract filter data: {e}")
+            return []
+
+    def _extract_group_ui_data(self, group: Any) -> list[dict[str, Any]]:
+        """Extract UI format data from a condition group."""
+        if not hasattr(group, "conditions"):
+            return []
+
+        ui_data = []
+        for condition in group.conditions:
+            if (
+                hasattr(condition, "field_combo")
+                and hasattr(condition, "operator_combo")
+                and hasattr(condition, "value_input")
+            ):
+                # This is a ConditionWidget, extract UI data
+                field = condition.field_combo.currentText().strip()
+                operator = condition.operator_combo.currentText()
+                value = condition.value_input.text().strip()
+
+                if field and operator:
+                    ui_data.append(
+                        {"field": field, "operator": operator, "value": value}
+                    )
+
+        return ui_data
 
     def _load_find_template(self, template: QueryTemplate) -> None:
         """Load a find query template."""
@@ -1014,11 +1084,60 @@ class EnhancedQueryBuilderDialog(QDialog):
         if isinstance(field_data, dict) and field_data:
             operator = list(field_data.keys())[0]
             value = field_data[operator]
+            operator, value = self._convert_mongodb_operator_to_ui(operator, value)
         else:
-            operator = "$eq"
+            operator = "="
             value = field_data
 
         return field, operator, value
+
+    def _convert_mongodb_operator_to_ui(
+        self, operator: str, value: Any
+    ) -> tuple[str, Any]:
+        """Convert MongoDB operator to UI operator and adjust value if needed."""
+        if operator == "$regex":
+            return self._convert_regex_to_ui_format(value)
+        elif operator == "$exists":
+            return self._convert_exists_to_ui_format(value)
+        else:
+            return self._convert_standard_operator_to_ui(operator), value
+
+    def _convert_standard_operator_to_ui(self, operator: str) -> str:
+        """Convert standard MongoDB operators to UI operators."""
+        operator_mapping = {
+            "$eq": "=",
+            "$ne": "!=",
+            "$gt": ">",
+            "$gte": ">=",
+            "$lt": "<",
+            "$lte": "<=",
+            "$in": "in",
+            "$nin": "not in",
+        }
+        return operator_mapping.get(operator, "=")
+
+    def _convert_exists_to_ui_format(self, value: Any) -> tuple[str, str]:
+        """Convert $exists operator to UI format."""
+        operator = "exists" if value else "not exists"
+        return operator, ""  # Existence operators don't need a value in UI
+
+    def _convert_regex_to_ui_format(self, regex_value: str | Any) -> tuple[str, str]:
+        """Convert a MongoDB regex pattern back to UI operator and value."""
+        if isinstance(regex_value, str):
+            # Check for starts with pattern: ^value
+            if regex_value.startswith("^") and not regex_value.endswith("$"):
+                return "starts with", regex_value[1:]  # Remove the ^
+            # Check for ends with pattern: value$
+            elif regex_value.endswith("$") and not regex_value.startswith("^"):
+                return "ends with", regex_value[:-1]  # Remove the $
+            # Check for contains pattern: .*value.*
+            elif regex_value.startswith(".*") and regex_value.endswith(".*"):
+                return "contains", regex_value[2:-2]  # Remove .* from both ends
+            # Otherwise treat as raw regex
+            else:
+                return "regex", regex_value
+        else:
+            return "regex", str(regex_value)
 
     def _apply_condition_parts(
         self, condition_widget: Any, field: str, operator: str, value: Any
