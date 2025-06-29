@@ -6,7 +6,6 @@ Provides functionality to save, load, and manage query templates for reuse.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
 
 from PyQt6.QtCore import QObject, pyqtSignal
 
@@ -20,8 +19,8 @@ class QueryTemplate:
         query_type: str,
         query_data: dict,
         description: str = "",
-        tags: Optional[list[str]] = None,
-        created_at: Optional[datetime] = None,
+        tags: list[str] | None = None,
+        created_at: datetime | None = None,
     ):
         self.name = name
         self.query_type = query_type  # 'find' or 'aggregate'
@@ -66,7 +65,7 @@ class QueryTemplateManager(QObject):
 
     templates_changed = pyqtSignal()
 
-    def __init__(self, storage_dir: Optional[str] = None):
+    def __init__(self, storage_dir: str | None = None):
         super().__init__()
         self.storage_dir = Path(storage_dir or self._get_default_storage_dir())
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -121,7 +120,7 @@ class QueryTemplateManager(QObject):
         query_type: str,
         query_data: dict,
         description: str = "",
-        tags: Optional[list[str]] = None,
+        tags: list[str] | None = None,
     ) -> bool:
         """Save a query template."""
         if not name.strip():
@@ -139,7 +138,7 @@ class QueryTemplateManager(QObject):
         self._save_templates()
         return True
 
-    def load_template(self, name: str) -> Optional[QueryTemplate]:
+    def load_template(self, name: str) -> QueryTemplate | None:
         """Load a template by name."""
         return self._templates.get(name)
 
@@ -197,8 +196,8 @@ class QueryTemplateManager(QObject):
     def update_template(
         self,
         name: str,
-        description: Optional[str] = None,
-        tags: Optional[list[str]] = None,
+        description: str | None = None,
+        tags: list[str] | None = None,
     ) -> bool:
         """Update template metadata."""
         if name not in self._templates:

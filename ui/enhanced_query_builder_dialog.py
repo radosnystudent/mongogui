@@ -28,6 +28,12 @@ class EnhancedQueryBuilderDialog(QDialog):
     Enhanced Query Builder Dialog with support for both Find queries and Aggregation pipelines.
     """
 
+    # Constants for dialog titles
+    LOAD_ERROR_TITLE = "Load Error"
+    SAVE_ERROR_TITLE = "Save Error"
+    TEMPLATE_LOADED_TITLE = "Template Loaded"
+    TEMPLATE_SAVED_TITLE = "Template Saved"
+
     def __init__(self, fields: list[str], parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.fields = fields
@@ -50,6 +56,13 @@ class EnhancedQueryBuilderDialog(QDialog):
         layout.setContentsMargins(20, 20, 20, 20)
         layout.setSpacing(15)
 
+        self._add_header_components(layout)
+        self._setup_tab_widget(layout)
+        self._add_action_buttons(layout)
+        self._apply_dialog_styling()
+
+    def _add_header_components(self, layout: QVBoxLayout) -> None:
+        """Add title and description to the dialog."""
         # Title
         title_label = QLabel("MongoDB Query Builder")
         title_font = QFont()
@@ -68,8 +81,18 @@ class EnhancedQueryBuilderDialog(QDialog):
         desc_label.setStyleSheet("color: #aaa; font-size: 12px; margin-bottom: 15px;")
         layout.addWidget(desc_label)
 
-        # Tab widget for different query types
+    def _setup_tab_widget(self, layout: QVBoxLayout) -> None:
+        """Setup the main tab widget with Find and Aggregation tabs."""
         self.tab_widget = QTabWidget()
+        self._apply_tab_styling()
+        self._create_tabs()
+
+        # Connect tab change signal
+        self.tab_widget.currentChanged.connect(self._on_tab_changed)
+        layout.addWidget(self.tab_widget, stretch=1)
+
+    def _apply_tab_styling(self) -> None:
+        """Apply styling to the tab widget."""
         self.tab_widget.setStyleSheet(
             """
             QTabWidget::pane {
@@ -95,13 +118,14 @@ class EnhancedQueryBuilderDialog(QDialog):
         """
         )
 
+    def _create_tabs(self) -> None:
+        """Create and add the Find Query and Aggregation tabs."""
         # Find Query Tab
         self.find_tab = QWidget()
         self.find_builder = self._create_find_query_builder()
         find_layout = QVBoxLayout(self.find_tab)
         find_layout.setContentsMargins(10, 10, 10, 10)
         find_layout.addWidget(self.find_builder)
-
         self.tab_widget.addTab(self.find_tab, "🔍 Find Query")
 
         # Aggregation Pipeline Tab
@@ -110,159 +134,104 @@ class EnhancedQueryBuilderDialog(QDialog):
         aggregate_layout = QVBoxLayout(self.aggregate_tab)
         aggregate_layout.setContentsMargins(10, 10, 10, 10)
         aggregate_layout.addWidget(self.pipeline_builder)
-
         self.tab_widget.addTab(self.aggregate_tab, "🔧 Aggregation Pipeline")
 
-        # Connect tab change signal
-        self.tab_widget.currentChanged.connect(self._on_tab_changed)
-
-        layout.addWidget(self.tab_widget, stretch=1)
-
-        # Button layout
+    def _add_action_buttons(self, layout: QVBoxLayout) -> None:
+        """Add the action buttons at the bottom of the dialog."""
         button_layout = QHBoxLayout()
         button_layout.setSpacing(10)
 
-        # Template management buttons
-        save_template_btn = QPushButton("💾 Save Template")
-        save_template_btn.setToolTip("Save current query as a template")
-        save_template_btn.clicked.connect(self._save_template)
-        save_template_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4a5a6a;
-                color: #ddd;
-                font-weight: bold;
-                border: 1px solid #555;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #5a6a7a;
-                border-color: #666;
-            }
-        """
-        )
-        button_layout.addWidget(save_template_btn)
-
-        load_template_btn = QPushButton("📂 Load Template")
-        load_template_btn.setToolTip("Load a saved query template")
-        load_template_btn.clicked.connect(self._load_template)
-        load_template_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #5a4a6a;
-                color: #ddd;
-                font-weight: bold;
-                border: 1px solid #555;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #6a5a7a;
-                border-color: #666;
-            }
-        """
-        )
-        button_layout.addWidget(load_template_btn)
-
-        manage_templates_btn = QPushButton("🗂️ Manage")
-        manage_templates_btn.setToolTip("Manage saved templates")
-        manage_templates_btn.clicked.connect(self._manage_templates)
-        manage_templates_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #6a5a4a;
-                color: #ddd;
-                font-weight: bold;
-                border: 1px solid #555;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #7a6a5a;
-                border-color: #666;
-            }
-        """
-        )
-        button_layout.addWidget(manage_templates_btn)
-
-        # Clear button
-        clear_btn = QPushButton("Clear")
-        clear_btn.setToolTip("Clear the current query builder")
-        clear_btn.clicked.connect(self._clear_current_builder)
-        clear_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #505050;
-                color: #ddd;
-                font-weight: bold;
-                border: 1px solid #555;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #606060;
-                border-color: #666;
-            }
-        """
-        )
-        button_layout.addWidget(clear_btn)
-
-        button_layout.addStretch()
-
-        # Cancel button
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.setToolTip("Cancel and close dialog")
-        cancel_btn.clicked.connect(self.reject)
-        cancel_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #505050;
-                color: #ddd;
-                font-weight: bold;
-                border: 1px solid #555;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #606060;
-                border-color: #666;
-            }
-        """
-        )
-        button_layout.addWidget(cancel_btn)
-
-        # Build Query button
-        self.build_btn = QPushButton("Build Query")
-        self.build_btn.setToolTip("Build the query and insert into main window")
-        self.build_btn.clicked.connect(self._build_and_accept)
-        self.build_btn.setStyleSheet(
-            """
-            QPushButton {
-                background-color: #4a6741;
-                color: #ddd;
-                font-weight: bold;
-                border: 1px solid #555;
-                border-radius: 4px;
-                padding: 8px 16px;
-                font-size: 12px;
-            }
-            QPushButton:hover {
-                background-color: #5a7751;
-                border-color: #666;
-            }
-        """
-        )
-        button_layout.addWidget(self.build_btn)
+        self._add_template_buttons(button_layout)
+        self._add_utility_buttons(button_layout)
+        self._add_main_action_buttons(button_layout)
 
         layout.addLayout(button_layout)
 
-        # Set dialog style
+    def _add_template_buttons(self, button_layout: QHBoxLayout) -> None:
+        """Add template management buttons."""
+        save_template_btn = self._create_styled_button(
+            "💾 Save Template",
+            "Save current query as a template",
+            self._save_template,
+            "#4a5a6a",
+            "#5a6a7a",
+        )
+        button_layout.addWidget(save_template_btn)
+
+        load_template_btn = self._create_styled_button(
+            "📂 Load Template",
+            "Load a saved query template",
+            self._load_template,
+            "#5a4a6a",
+            "#6a5a7a",
+        )
+        button_layout.addWidget(load_template_btn)
+
+        manage_templates_btn = self._create_styled_button(
+            "🗂️ Manage",
+            "Manage saved templates",
+            self._manage_templates,
+            "#6a5a4a",
+            "#7a6a5a",
+        )
+        button_layout.addWidget(manage_templates_btn)
+
+    def _add_utility_buttons(self, button_layout: QHBoxLayout) -> None:
+        """Add utility buttons like Clear."""
+        clear_btn = self._create_styled_button(
+            "Clear",
+            "Clear the current query builder",
+            self._clear_current_builder,
+            "#505050",
+            "#606060",
+        )
+        button_layout.addWidget(clear_btn)
+        button_layout.addStretch()
+
+    def _add_main_action_buttons(self, button_layout: QHBoxLayout) -> None:
+        """Add the main action buttons (Cancel, Build Query)."""
+        cancel_btn = self._create_styled_button(
+            "Cancel", "Cancel and close dialog", self.reject, "#505050", "#606060"
+        )
+        button_layout.addWidget(cancel_btn)
+
+        self.build_btn = self._create_styled_button(
+            "Build Query",
+            "Build the query and insert into main window",
+            self._build_and_accept,
+            "#4a6741",
+            "#5a7751",
+        )
+        button_layout.addWidget(self.build_btn)
+
+    def _create_styled_button(
+        self, text: str, tooltip: str, callback: Any, bg_color: str, hover_color: str
+    ) -> QPushButton:
+        """Create a styled button with consistent appearance."""
+        button = QPushButton(text)
+        button.setToolTip(tooltip)
+        button.clicked.connect(callback)
+        button.setStyleSheet(
+            f"""
+            QPushButton {{
+                background-color: {bg_color};
+                color: #ddd;
+                font-weight: bold;
+                border: 1px solid #555;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-size: 12px;
+            }}
+            QPushButton:hover {{
+                background-color: {hover_color};
+                border-color: #666;
+            }}
+        """
+        )
+        return button
+
+    def _apply_dialog_styling(self) -> None:
+        """Apply overall dialog styling."""
         self.setStyleSheet(
             """
             QDialog {
@@ -274,20 +243,19 @@ class EnhancedQueryBuilderDialog(QDialog):
 
     def _create_find_query_builder(self) -> QWidget:
         """Create the find query builder widget."""
-        # Create a container widget to hold the find builder components
         container = QWidget()
         layout = QVBoxLayout(container)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        # Create a simplified version of the find query builder
-        # We'll reuse the components from QueryBuilderDialog but integrate them here
-        from PyQt6.QtWidgets import QComboBox, QLineEdit, QScrollArea
+        self._add_find_group_button(layout)
+        self._setup_find_scroll_area(layout)
+        self._add_find_controls(layout)
+        self._initialize_find_root_group()
 
-        from ui.query_builder_dialog import (
-            ConditionGroup,
-        )
+        return container
 
-        # Add Group button
+    def _add_find_group_button(self, layout: QVBoxLayout) -> None:
+        """Add the 'Add Group' button to the find builder."""
         add_group_btn = QPushButton("+ Add Group")
         add_group_btn.setToolTip("Add a new condition group")
         add_group_btn.clicked.connect(self._add_find_group)
@@ -310,7 +278,10 @@ class EnhancedQueryBuilderDialog(QDialog):
         )
         layout.addWidget(add_group_btn)
 
-        # Scroll area for groups
+    def _setup_find_scroll_area(self, layout: QVBoxLayout) -> None:
+        """Setup the scroll area for condition groups."""
+        from PyQt6.QtWidgets import QScrollArea
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(scroll.Shape.NoFrame)
@@ -336,12 +307,21 @@ class EnhancedQueryBuilderDialog(QDialog):
         scroll.setWidget(self.find_groups_widget)
         layout.addWidget(scroll, stretch=1)
 
-        # Sort/Limit/Skip Controls
+    def _add_find_controls(self, layout: QVBoxLayout) -> None:
+        """Add sort, limit, and skip controls to the find builder."""
         controls_group = QWidget()
         controls_layout = QVBoxLayout(controls_group)
         controls_layout.setContentsMargins(0, 0, 0, 0)
 
-        # Sort controls
+        self._add_sort_controls(controls_layout)
+        self._add_limit_skip_controls(controls_layout)
+
+        layout.addWidget(controls_group)
+
+    def _add_sort_controls(self, controls_layout: QVBoxLayout) -> None:
+        """Add sort controls to the find builder."""
+        from PyQt6.QtWidgets import QComboBox
+
         sort_container = QWidget()
         sort_layout = QHBoxLayout(sort_container)
         sort_layout.setContentsMargins(0, 0, 0, 0)
@@ -363,7 +343,10 @@ class EnhancedQueryBuilderDialog(QDialog):
         sort_layout.addStretch()
         controls_layout.addWidget(sort_container)
 
-        # Limit/Skip controls
+    def _add_limit_skip_controls(self, controls_layout: QVBoxLayout) -> None:
+        """Add limit and skip controls to the find builder."""
+        from PyQt6.QtWidgets import QLineEdit
+
         limit_container = QWidget()
         limit_layout = QHBoxLayout(limit_container)
         limit_layout.setContentsMargins(0, 0, 0, 0)
@@ -389,13 +372,12 @@ class EnhancedQueryBuilderDialog(QDialog):
         limit_layout.addStretch()
         controls_layout.addWidget(limit_container)
 
-        layout.addWidget(controls_group)
+    def _initialize_find_root_group(self) -> None:
+        """Initialize the find builder with the root condition group."""
+        from ui.query_builder_dialog import ConditionGroup
 
-        # Initialize with one root group
         self.find_root_group: ConditionGroup | None = None
         self._create_find_root_group()
-
-        return container
 
     def _create_find_root_group(self) -> None:
         """Create the initial root group for find queries."""
@@ -403,11 +385,12 @@ class EnhancedQueryBuilderDialog(QDialog):
 
         self.find_root_group = ConditionGroup(self.fields)
         # Remove the remove button from root group
-        remove_btn = self.find_root_group.findChild(QPushButton)
-        if remove_btn and remove_btn.text() == "×":
-            remove_btn.setVisible(False)
+        if self.find_root_group:
+            remove_btn = self.find_root_group.findChild(QPushButton)
+            if remove_btn and remove_btn.text() == "×":
+                remove_btn.setVisible(False)
 
-        self.find_groups_layout.insertWidget(0, self.find_root_group)
+            self.find_groups_layout.insertWidget(0, self.find_root_group)
 
     def _add_find_group(self) -> None:
         """Add a new top-level group to find query builder."""
@@ -721,14 +704,16 @@ class EnhancedQueryBuilderDialog(QDialog):
             if success:
                 QMessageBox.information(
                     self,
-                    "Template Saved",
+                    self.TEMPLATE_SAVED_TITLE,
                     f"Template '{name.strip()}' has been saved successfully.",
                 )
             else:
-                QMessageBox.warning(self, "Save Error", "Failed to save template.")
+                QMessageBox.warning(
+                    self, self.SAVE_ERROR_TITLE, "Failed to save template."
+                )
         except Exception as e:
             QMessageBox.warning(
-                self, "Save Error", f"Failed to save template: {str(e)}"
+                self, self.SAVE_ERROR_TITLE, f"Failed to save template: {str(e)}"
             )
 
     def _load_template(self) -> None:
@@ -764,28 +749,39 @@ class EnhancedQueryBuilderDialog(QDialog):
         template_name = item.split(" - ")[0]
 
         try:
-            template = self.template_manager.load_template(template_name)
-            if template is None:
+            maybe_template = self.template_manager.load_template(template_name)
+            if maybe_template is None:
                 QMessageBox.warning(
-                    self, "Load Error", f"Template '{template_name}' not found."
+                    self,
+                    self.LOAD_ERROR_TITLE,
+                    f"Template '{template_name}' not found.",
                 )
                 return
 
             # Load the template based on type
+            # At this point, template is guaranteed to be non-None
+            template = maybe_template
             if template.query_type == "find":
                 self._load_find_template(template)
             elif template.query_type == "aggregate":
                 self._load_aggregate_template(template)
+            else:
+                QMessageBox.warning(
+                    self,
+                    self.LOAD_ERROR_TITLE,
+                    f"Unknown query type: {template.query_type}",
+                )
+                return
 
             QMessageBox.information(
                 self,
-                "Template Loaded",
+                self.TEMPLATE_LOADED_TITLE,
                 f"Template '{template_name}' has been loaded successfully.",
             )
 
         except Exception as e:
             QMessageBox.warning(
-                self, "Load Error", f"Failed to load template: {str(e)}"
+                self, self.LOAD_ERROR_TITLE, f"Failed to load template: {str(e)}"
             )
 
     def _manage_templates(self) -> None:
@@ -849,12 +845,203 @@ class EnhancedQueryBuilderDialog(QDialog):
 
         # Load pipeline stages
         pipeline = template.query_data.get("pipeline", [])
-        for stage in pipeline:
-            # For now, we'll add stages as raw JSON since add_stage_from_data doesn't exist
-            pass
+
+        # If we have stages to load, replace the default stage and add the rest
+        if pipeline:
+            # Set the first stage if it exists
+            if len(pipeline) > 0 and self.pipeline_builder.stages:
+                first_stage = pipeline[0]
+                self._configure_stage_from_data(
+                    self.pipeline_builder.stages[0], first_stage
+                )
+
+            # Add remaining stages
+            for stage_data in pipeline[1:]:
+                self.pipeline_builder.add_stage()
+                if self.pipeline_builder.stages:
+                    last_stage = self.pipeline_builder.stages[-1]
+                    self._configure_stage_from_data(last_stage, stage_data)
+
+        # Update the pipeline preview
+        self.pipeline_builder._update_pipeline_preview()
+
+    def _configure_stage_from_data(
+        self, stage_widget: Any, stage_data: dict[str, Any]
+    ) -> None:
+        """Configure a pipeline stage widget from template data."""
+        if not stage_data:
+            return
+
+        # Extract stage type and configuration
+        stage_type = list(stage_data.keys())[0] if stage_data else "$match"
+        stage_config = stage_data.get(stage_type, {})
+
+        # Set the stage type and configuration
+        stage_widget.stage_type = stage_type
+        stage_widget.stage_config = stage_config
+
+        # Update the UI to reflect the new stage type
+        if hasattr(stage_widget, "stage_combo"):
+            # Find and set the correct stage type in the combo box
+            combo = stage_widget.stage_combo
+            for i in range(combo.count()):
+                if combo.itemText(i) == stage_type:
+                    combo.setCurrentIndex(i)
+                    break
+
+        # Update the preview
+        stage_widget._update_preview()
 
     def _add_filter_from_data(self, filter_data: dict[str, Any]) -> None:
         """Add a filter widget from saved data."""
-        # This would need to be implemented based on the filter widget structure
-        # For now, we'll skip this complex reconstruction
-        pass
+        if not filter_data or not self.find_root_group:
+            return
+
+        try:
+            # If this is the first filter and root group is empty, use it
+            if not self.find_root_group.conditions:
+                self._populate_condition_from_data(self.find_root_group, filter_data)
+            else:
+                # Add a new condition to the root group
+                self.find_root_group.add_condition()
+                if self.find_root_group.conditions:
+                    last_condition = self.find_root_group.conditions[-1]
+                    # Check if it's a ConditionWidget (not a ConditionGroup)
+                    from ui.query_builder_dialog import ConditionWidget
+
+                    if isinstance(last_condition, ConditionWidget):
+                        self._set_condition_components(last_condition, filter_data)
+        except Exception as e:
+            # If we can't properly reconstruct the filter, just skip it
+            # This ensures the template loading doesn't completely fail
+            print(f"Warning: Could not load filter data: {e}")
+
+    def _populate_condition_from_data(
+        self, group: Any, filter_data: dict[str, Any]
+    ) -> None:
+        """Populate a condition group from filter data."""
+        if not filter_data:
+            return
+
+        if self._is_logical_operation(filter_data):
+            self._handle_logical_operation(group, filter_data)
+        else:
+            self._handle_single_condition(group, filter_data)
+
+    def _is_logical_operation(self, filter_data: dict[str, Any]) -> bool:
+        """Check if filter data represents a logical operation."""
+        return "$and" in filter_data or "$or" in filter_data
+
+    def _handle_logical_operation(
+        self, group: Any, filter_data: dict[str, Any]
+    ) -> None:
+        """Handle logical operations like $and/$or."""
+        operator = "$and" if "$and" in filter_data else "$or"
+        conditions = filter_data[operator]
+
+        for condition_data in conditions:
+            self._add_condition_to_group(group, condition_data)
+
+    def _handle_single_condition(self, group: Any, filter_data: dict[str, Any]) -> None:
+        """Handle a single condition."""
+        self._add_condition_to_group(group, filter_data)
+
+    def _add_condition_to_group(
+        self, group: Any, condition_data: dict[str, Any]
+    ) -> None:
+        """Add a condition to the group and populate it."""
+        group.add_condition()
+        if group.conditions:
+            last_condition = group.conditions[-1]
+            from ui.query_builder_dialog import ConditionWidget
+
+            if isinstance(last_condition, ConditionWidget):
+                self._set_condition_components(last_condition, condition_data)
+
+    def _set_condition_components(
+        self, condition_widget: Any, filter_data: dict[str, Any]
+    ) -> None:
+        """Set the components of a condition widget from filter data."""
+        if not self._can_set_condition_components(condition_widget, filter_data):
+            return
+
+        try:
+            field, operator, value = self._extract_condition_parts(filter_data)
+            self._apply_condition_parts(condition_widget, field, operator, value)
+        except Exception as e:
+            print(f"Warning: Could not set condition components: {e}")
+
+    def _can_set_condition_components(
+        self, condition_widget: Any, filter_data: dict[str, Any]
+    ) -> bool:
+        """Check if condition components can be set."""
+        return hasattr(condition_widget, "field_combo") and bool(filter_data)
+
+    def _extract_condition_parts(
+        self, filter_data: dict[str, Any]
+    ) -> tuple[str, str, Any]:
+        """Extract field, operator, and value from filter data."""
+        if self._is_direct_format(filter_data):
+            return self._extract_from_direct_format(filter_data)
+        else:
+            return self._extract_from_mongodb_format(filter_data)
+
+    def _is_direct_format(self, filter_data: dict[str, Any]) -> bool:
+        """Check if filter data is in direct format."""
+        return (
+            "field" in filter_data
+            and "operator" in filter_data
+            and "value" in filter_data
+        )
+
+    def _extract_from_direct_format(
+        self, filter_data: dict[str, Any]
+    ) -> tuple[str, str, Any]:
+        """Extract parts from direct format."""
+        return (
+            filter_data["field"],
+            filter_data["operator"],
+            filter_data["value"],
+        )
+
+    def _extract_from_mongodb_format(
+        self, filter_data: dict[str, Any]
+    ) -> tuple[str, str, Any]:
+        """Extract parts from MongoDB query format."""
+        field = list(filter_data.keys())[0] if filter_data else ""
+        field_data = filter_data.get(field, {})
+
+        if isinstance(field_data, dict) and field_data:
+            operator = list(field_data.keys())[0]
+            value = field_data[operator]
+        else:
+            operator = "$eq"
+            value = field_data
+
+        return field, operator, value
+
+    def _apply_condition_parts(
+        self, condition_widget: Any, field: str, operator: str, value: Any
+    ) -> None:
+        """Apply the extracted parts to the condition widget."""
+        self._set_field_component(condition_widget, field)
+        self._set_operator_component(condition_widget, operator)
+        self._set_value_component(condition_widget, value)
+
+    def _set_field_component(self, condition_widget: Any, field: str) -> None:
+        """Set the field component."""
+        if hasattr(condition_widget, "field_combo"):
+            condition_widget.field_combo.setCurrentText(field)
+
+    def _set_operator_component(self, condition_widget: Any, operator: str) -> None:
+        """Set the operator component."""
+        if hasattr(condition_widget, "operator_combo"):
+            condition_widget.operator_combo.setCurrentText(operator)
+
+    def _set_value_component(self, condition_widget: Any, value: Any) -> None:
+        """Set the value component."""
+        if hasattr(condition_widget, "value_input"):
+            if isinstance(value, str | int | float):
+                condition_widget.value_input.setText(str(value))
+            else:
+                condition_widget.value_input.setText(json.dumps(value))

@@ -4,7 +4,6 @@ Provides UI for saving, loading, and managing query templates.
 """
 
 import json
-from typing import Optional
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
@@ -34,7 +33,7 @@ class TemplateManagementDialog(QDialog):
     ):
         super().__init__(parent)
         self.template_manager = template_manager
-        self.selected_template: Optional[QueryTemplate] = None
+        self.selected_template: QueryTemplate | None = None
 
         self.setWindowTitle("Query Template Manager")
         self.setModal(True)
